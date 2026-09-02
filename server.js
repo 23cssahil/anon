@@ -23,7 +23,10 @@ if (!process.env.EDESY_API_KEY) {
     process.exit(1);
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.EDESY_WEBHOOK_SECRET) {
+if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.EDESY_WEBHOOK_SECRET
+) {
     console.error('EDESY_WEBHOOK_SECRET is required in production');
     process.exit(1);
 }
@@ -41,12 +44,23 @@ app.use(express.json({
 
 app.use(express.static('public'));
 
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/public/index.html');
+});
+
 app.get('/dashboard', (req, res) => {
     res.sendFile(__dirname + '/public/dashboard.html');
 });
 
 app.get('/dashboard.html', (req, res) => {
     res.sendFile(__dirname + '/public/dashboard.html');
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        status: 'ok'
+    });
 });
 
 const callLimiter = rateLimit({
@@ -81,16 +95,24 @@ const rechargeLimiter = rateLimit({
 
 const CALL_RATE_PER_MINUTE = 3.00;
 const GST_RATE = 0.18;
+
 const USER_RATE_WITH_GST = Number(
     (CALL_RATE_PER_MINUTE * (1 + GST_RATE)).toFixed(2)
 );
 
 const COMMISSION_PER_MINUTE = 1.50;
+
 const EDESY_RATE_WITH_GST = Number(
     (COMMISSION_PER_MINUTE * (1 + GST_RATE)).toFixed(2)
 );
 
 const MAX_CALL_MINUTES = 60;
+
+function roundMoney(value) {
+    return Number(
+        (Number(value) || 0).toFixed(2)
+    );
+}
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -149,7 +171,10 @@ function sanitizeInput(input) {
 function getClientIp(req) {
     const forwarded = req.headers['x-forwarded-for'];
 
-    if (typeof forwarded === 'string' && forwarded.length > 0) {
+    if (
+        typeof forwarded === 'string' &&
+        forwarded.length > 0
+    ) {
         return forwarded.split(',')[0].trim();
     }
 
@@ -159,7 +184,9 @@ function getClientIp(req) {
 function calculateBilling(actualDurationSeconds) {
     const seconds = Math.max(
         0,
-        Math.floor(Number(actualDurationSeconds) || 0)
+        Math.floor(
+            Number(actualDurationSeconds) || 0
+        )
     );
 
     const billableMinutes =
@@ -167,28 +194,34 @@ function calculateBilling(actualDurationSeconds) {
             ? Math.ceil(seconds / 60)
             : 0;
 
-    const baseCost = Number(
-        (billableMinutes * CALL_RATE_PER_MINUTE).toFixed(2)
+    const baseCost = roundMoney(
+        billableMinutes *
+        CALL_RATE_PER_MINUTE
     );
 
-    const gstAmount = Number(
-        (baseCost * GST_RATE).toFixed(2)
+    const gstAmount = roundMoney(
+        baseCost *
+        GST_RATE
     );
 
-    const totalCost = Number(
-        (baseCost + gstAmount).toFixed(2)
+    const totalCost = roundMoney(
+        baseCost +
+        gstAmount
     );
 
-    const providerBaseCost = Number(
-        (billableMinutes * COMMISSION_PER_MINUTE).toFixed(2)
+    const providerBaseCost = roundMoney(
+        billableMinutes *
+        COMMISSION_PER_MINUTE
     );
 
-    const providerGst = Number(
-        (providerBaseCost * GST_RATE).toFixed(2)
+    const providerGst = roundMoney(
+        providerBaseCost *
+        GST_RATE
     );
 
-    const providerTotalCost = Number(
-        (providerBaseCost + providerGst).toFixed(2)
+    const providerTotalCost = roundMoney(
+        providerBaseCost +
+        providerGst
     );
 
     return {
@@ -373,6 +406,11 @@ const callSchema = new mongoose.Schema({
         index: true
     },
 
+    billingVersion: {
+        type: String,
+        default: 'v2'
+    },
+
     startedAt: {
         type: Date,
         default: Date.now
@@ -494,11 +532,9 @@ app.get('/api/pool-status', async (req, res) => {
         const edesyTotalMins =
             await getEdesyBalance();
 
-        const edesyTotalRupees = Number(
-            (
-                edesyTotalMins *
-                COMMISSION_PER_MINUTE
-            ).toFixed(2)
+        const edesyTotalRupees = roundMoney(
+            edesyTotalMins *
+            COMMISSION_PER_MINUTE
         );
 
         const assignedRupees =
@@ -506,11 +542,9 @@ app.get('/api/pool-status', async (req, res) => {
 
         const availablePoolRupees = Math.max(
             0,
-            Number(
-                (
-                    edesyTotalRupees -
-                    assignedRupees
-                ).toFixed(2)
+            roundMoney(
+                edesyTotalRupees -
+                assignedRupees
             )
         );
 
@@ -655,11 +689,14 @@ app.post(
                 success: true,
                 token,
                 user: {
-                    userId: user._id.toString(),
+                    userId:
+                        user._id.toString(),
                     name: user.name,
                     email: user.email,
-                    balance: user.balance,
-                    termsAccepted: user.termsAccepted
+                    balance:
+                        roundMoney(user.balance),
+                    termsAccepted:
+                        user.termsAccepted
                 }
             });
         } catch (error) {
@@ -669,7 +706,8 @@ app.post(
             );
 
             res.status(500).json({
-                error: 'Server error during login'
+                error:
+                    'Server error during login'
             });
         }
     }
@@ -690,16 +728,19 @@ app.post(
                 baseAmount > 100000
             ) {
                 return res.status(400).json({
-                    error: 'Valid recharge amount required'
+                    error:
+                        'Valid recharge amount required'
                 });
             }
 
-            const gstAmount = Number(
-                (baseAmount * GST_RATE).toFixed(2)
+            const gstAmount = roundMoney(
+                baseAmount *
+                GST_RATE
             );
 
-            const totalAmount = Number(
-                (baseAmount + gstAmount).toFixed(2)
+            const totalAmount = roundMoney(
+                baseAmount +
+                gstAmount
             );
 
             if (
@@ -722,8 +763,9 @@ app.post(
                 });
             }
 
-            user.balance = Number(
-                (user.balance + baseAmount).toFixed(2)
+            user.balance = roundMoney(
+                user.balance +
+                baseAmount
             );
 
             await user.save();
@@ -735,8 +777,10 @@ app.post(
                 baseAmount,
                 gstAmount,
                 totalAmount,
-                creditedAmount: baseAmount,
-                newBalance: user.balance
+                creditedAmount:
+                    baseAmount,
+                newBalance:
+                    roundMoney(user.balance)
             });
         } catch (error) {
             console.error(
@@ -758,11 +802,13 @@ app.get(
     async (req, res) => {
         try {
             if (
-                req.user.userId !== req.params.userId &&
+                req.user.userId !==
+                    req.params.userId &&
                 !req.user.isAdmin
             ) {
                 return res.status(403).json({
-                    error: 'Unauthorized access'
+                    error:
+                        'Unauthorized access'
                 });
             }
 
@@ -772,7 +818,8 @@ app.get(
                 )
             ) {
                 return res.status(400).json({
-                    error: 'Invalid user ID'
+                    error:
+                        'Invalid user ID'
                 });
             }
 
@@ -783,13 +830,16 @@ app.get(
 
             if (!user) {
                 return res.status(404).json({
-                    error: 'User not found'
+                    error:
+                        'User not found'
                 });
             }
 
             res.json({
-                balance: user.balance,
-                name: user.name,
+                balance:
+                    roundMoney(user.balance),
+                name:
+                    user.name,
                 termsAccepted:
                     user.termsAccepted
             });
@@ -800,7 +850,8 @@ app.get(
             );
 
             res.status(500).json({
-                error: 'Error fetching balance'
+                error:
+                    'Error fetching balance'
             });
         }
     }
@@ -811,6 +862,9 @@ app.post(
     authenticateToken,
     callLimiter,
     async (req, res) => {
+        let reserveAmount = 0;
+        let reservationTaken = false;
+
         try {
             const phoneNumber =
                 String(
@@ -854,7 +908,8 @@ app.post(
 
             if (!user) {
                 return res.status(404).json({
-                    error: 'User not found'
+                    error:
+                        'User not found'
                 });
             }
 
@@ -867,7 +922,8 @@ app.post(
 
             if (
                 !Number.isFinite(user.balance) ||
-                user.balance < USER_RATE_WITH_GST
+                user.balance <
+                    USER_RATE_WITH_GST
             ) {
                 return res.status(400).json({
                     error:
@@ -924,13 +980,10 @@ app.post(
                     );
             }
 
-            const reserveAmount =
-                Number(
-                    (
-                        durationLimitMinutes *
-                        USER_RATE_WITH_GST
-                    ).toFixed(2)
-                );
+            reserveAmount = roundMoney(
+                durationLimitMinutes *
+                USER_RATE_WITH_GST
+            );
 
             const clientIp =
                 getClientIp(req);
@@ -949,7 +1002,8 @@ app.post(
                     },
                     {
                         $inc: {
-                            balance: -reserveAmount
+                            balance:
+                                -reserveAmount
                         }
                     },
                     {
@@ -963,6 +1017,8 @@ app.post(
                         'Insufficient wallet balance.'
                 });
             }
+
+            reservationTaken = true;
 
             let edesyData = null;
 
@@ -978,12 +1034,13 @@ app.post(
                                 'Content-Type':
                                     'application/json'
                             },
-                            body: JSON.stringify({
-                                party_a:
-                                    userPhone,
-                                party_b:
-                                    phoneNumber
-                            })
+                            body:
+                                JSON.stringify({
+                                    party_a:
+                                        userPhone,
+                                    party_b:
+                                        phoneNumber
+                                })
                         }
                     );
 
@@ -1005,6 +1062,8 @@ app.post(
                         }
                     );
 
+                    reservationTaken = false;
+
                     const errorMsg =
                         edesyData?.message ||
                         edesyData?.error ||
@@ -1012,8 +1071,10 @@ app.post(
                         'Edesy API error occurred';
 
                     return res.status(400).json({
-                        error: errorMsg,
-                        edesy: edesyData
+                        error:
+                            errorMsg,
+                        edesy:
+                            edesyData
                     });
                 }
             } catch (providerError) {
@@ -1026,6 +1087,8 @@ app.post(
                         }
                     }
                 );
+
+                reservationTaken = false;
 
                 throw providerError;
             }
@@ -1048,10 +1111,13 @@ app.post(
                     }
                 );
 
+                reservationTaken = false;
+
                 return res.status(502).json({
                     error:
                         'Edesy did not return a call_sid. Amount refunded.',
-                    edesy: edesyData
+                    edesy:
+                        edesyData
                 });
             }
 
@@ -1087,6 +1153,8 @@ app.post(
                         reserveAmount,
                     billingFinalized:
                         false,
+                    billingVersion:
+                        'v2',
                     startedAt:
                         new Date(),
                     clientIp,
@@ -1104,6 +1172,8 @@ app.post(
                     }
                 );
 
+                reservationTaken = false;
+
                 throw historyError;
             }
 
@@ -1113,7 +1183,9 @@ app.post(
                     'Call initiated successfully!',
                 callSid,
                 remainingBalance:
-                    reservedUser.balance,
+                    roundMoney(
+                        reservedUser.balance
+                    ),
                 reservedAmount:
                     reserveAmount,
                 maxDurationMinutes:
@@ -1132,6 +1204,28 @@ app.post(
                 'Call error:',
                 error.message
             );
+
+            if (
+                reservationTaken &&
+                reserveAmount > 0
+            ) {
+                try {
+                    await User.findByIdAndUpdate(
+                        req.user.userId,
+                        {
+                            $inc: {
+                                balance:
+                                    reserveAmount
+                            }
+                        }
+                    );
+                } catch (refundError) {
+                    console.error(
+                        'Emergency refund error:',
+                        refundError.message
+                    );
+                }
+            }
 
             res.status(500).json({
                 error:
@@ -1180,7 +1274,10 @@ function extractDurationSeconds(payload) {
     ];
 
     for (const value of values) {
-        if (typeof value === 'string' && value.includes(':')) {
+        if (
+            typeof value === 'string' &&
+            value.includes(':')
+        ) {
             const parts =
                 value.split(':').map(Number);
 
@@ -1206,7 +1303,8 @@ function extractDurationSeconds(payload) {
             }
         }
 
-        const seconds = Number(value);
+        const seconds =
+            Number(value);
 
         if (
             Number.isFinite(seconds) &&
@@ -1295,7 +1393,7 @@ function verifyEdesyWebhook(req) {
         process.env.EDESY_WEBHOOK_SECRET;
 
     if (!secret) {
-        return process.env.NODE_ENV !== 'production';
+        return false;
     }
 
     const received =
@@ -1311,9 +1409,11 @@ function verifyEdesyWebhook(req) {
     const rawBody =
         Buffer.isBuffer(req.rawBody)
             ? req.rawBody
-            : Buffer.from(
-                JSON.stringify(req.body)
-            );
+            : null;
+
+    if (!rawBody) {
+        return false;
+    }
 
     const expected =
         crypto
@@ -1374,13 +1474,14 @@ app.post(
 
             if (!callSid) {
                 console.log(
-                    'Edesy webhook received without call_sid:',
-                    eventName || 'unknown-event'
+                    'Edesy webhook test/event without call_sid:',
+                    eventName || 'unknown'
                 );
 
                 return res.status(200).json({
                     success: true,
                     ignored: true,
+                    test: true,
                     reason:
                         'No call_sid in event'
                 });
@@ -1399,7 +1500,7 @@ app.post(
 
             if (!history) {
                 console.log(
-                    'Edesy webhook received for unknown call:',
+                    'Webhook for unknown call:',
                     callSid
                 );
 
@@ -1421,17 +1522,22 @@ app.post(
 
             if (
                 status &&
-                terminalStatuses.includes(status)
+                terminalStatuses.includes(
+                    status
+                )
             ) {
                 const claimedHistory =
                     await CallHistory.findOneAndUpdate(
                         {
-                            _id: history._id,
-                            billingFinalized: false
+                            _id:
+                                history._id,
+                            billingFinalized:
+                                false
                         },
                         {
                             $set: {
-                                billingFinalized: true
+                                billingFinalized:
+                                    true
                             }
                         },
                         {
@@ -1440,31 +1546,34 @@ app.post(
                     );
 
                 if (!claimedHistory) {
-                    return res.json({
+                    return res.status(200).json({
                         success: true,
-                        alreadyFinalized: true
+                        alreadyFinalized:
+                            true
                     });
                 }
 
                 const billing =
-                    durationSeconds > 0
-                        ? calculateBilling(
-                            durationSeconds
-                        )
-                        : calculateBilling(0);
+                    calculateBilling(
+                        durationSeconds
+                    );
+
+                const reservedAmount =
+                    roundMoney(
+                        claimedHistory
+                            .reservedAmount || 0
+                    );
 
                 const finalCharge =
                     Math.min(
                         billing.totalCost,
-                        claimedHistory.reservedAmount
+                        reservedAmount
                     );
 
                 const refund =
-                    Number(
-                        (
-                            claimedHistory.reservedAmount -
-                            finalCharge
-                        ).toFixed(2)
+                    roundMoney(
+                        reservedAmount -
+                        finalCharge
                     );
 
                 if (refund > 0) {
@@ -1485,9 +1594,11 @@ app.post(
                         $set: {
                             status,
                             durationSeconds:
-                                billing.actualDurationSeconds,
+                                billing
+                                    .actualDurationSeconds,
                             durationMinutes:
-                                billing.billableMinutes,
+                                billing
+                                    .billableMinutes,
                             baseCost:
                                 billing.baseCost,
                             gstAmount:
@@ -1495,11 +1606,14 @@ app.post(
                             cost:
                                 finalCharge,
                             providerBaseCost:
-                                billing.providerBaseCost,
+                                billing
+                                    .providerBaseCost,
                             providerGst:
-                                billing.providerGst,
+                                billing
+                                    .providerGst,
                             providerTotalCost:
-                                billing.providerTotalCost,
+                                billing
+                                    .providerTotalCost,
                             endedAt:
                                 new Date(),
                             edesyData:
@@ -1508,14 +1622,16 @@ app.post(
                     }
                 );
 
-                return res.json({
+                return res.status(200).json({
                     success: true,
                     callSid,
                     status,
                     durationSeconds:
-                        billing.actualDurationSeconds,
+                        billing
+                            .actualDurationSeconds,
                     billableMinutes:
-                        billing.billableMinutes,
+                        billing
+                            .billableMinutes,
                     charged:
                         finalCharge,
                     refunded:
@@ -1524,11 +1640,13 @@ app.post(
             }
 
             const update = {
-                edesyData: payload
+                edesyData:
+                    payload
             };
 
             if (status) {
-                update.status = status;
+                update.status =
+                    status;
             }
 
             if (status === 'answered') {
@@ -1543,21 +1661,24 @@ app.post(
 
                 update.durationMinutes =
                     Math.ceil(
-                        durationSeconds / 60
+                        durationSeconds /
+                        60
                     );
             }
 
             await CallHistory.findByIdAndUpdate(
                 history._id,
                 {
-                    $set: update
+                    $set:
+                        update
                 }
             );
 
-            return res.json({
+            return res.status(200).json({
                 success: true,
                 callSid,
-                status: status || null
+                status:
+                    status || null
             });
         } catch (error) {
             console.error(
@@ -1585,7 +1706,8 @@ app.get(
 
             if (!callSid) {
                 return res.status(400).json({
-                    error: 'callSid required'
+                    error:
+                        'callSid required'
                 });
             }
 
@@ -1800,70 +1922,118 @@ if (
 
 async function migrateDatabase() {
     try {
+        console.log(
+            'Running SAFE database migration...'
+        );
+
         const collection =
             CallHistory.collection;
 
-        const legacyHistories =
-            await collection.find({}).toArray();
+        const histories =
+            await collection
+                .find({})
+                .toArray();
 
         let historyUpdates = 0;
 
-        for (const h of legacyHistories) {
+        for (const h of histories) {
             const set = {};
-            const unset = {};
 
-            if (h.durationSeconds === undefined) {
-                set.durationSeconds = 0;
+            if (
+                h.durationSeconds === undefined ||
+                h.durationSeconds === null
+            ) {
+                const legacyMinutes =
+                    Number(
+                        h.durationMinutes ??
+                        h.minutes ??
+                        0
+                    );
+
+                set.durationSeconds =
+                    Number.isFinite(
+                        legacyMinutes
+                    ) &&
+                    legacyMinutes > 0
+                        ? Math.floor(
+                            legacyMinutes * 60
+                        )
+                        : 0;
             }
 
-            if (h.durationMinutes === undefined) {
-                const legacyMinutes =
-                    Number(h.minutes);
+            if (
+                h.durationMinutes === undefined ||
+                h.durationMinutes === null
+            ) {
+                const seconds =
+                    Number(
+                        h.durationSeconds ||
+                        0
+                    );
 
                 set.durationMinutes =
-                    Number.isFinite(legacyMinutes) &&
-                    legacyMinutes > 0
-                        ? legacyMinutes
+                    Number.isFinite(seconds) &&
+                    seconds > 0
+                        ? Math.ceil(
+                            seconds / 60
+                        )
                         : 0;
             }
 
-            if (h.cost === undefined) {
-                const legacyCost =
-                    Number(h.cost);
-
-                set.cost =
-                    Number.isFinite(legacyCost) &&
-                    legacyCost >= 0
-                        ? legacyCost
-                        : 0;
+            if (
+                h.cost === undefined ||
+                h.cost === null
+            ) {
+                set.cost = 0;
             }
 
-            if (h.baseCost === undefined) {
+            if (
+                h.baseCost === undefined ||
+                h.baseCost === null
+            ) {
                 set.baseCost =
                     Number(h.cost || 0);
             }
 
-            if (h.gstAmount === undefined) {
+            if (
+                h.gstAmount === undefined ||
+                h.gstAmount === null
+            ) {
                 set.gstAmount = 0;
             }
 
-            if (h.providerBaseCost === undefined) {
+            if (
+                h.providerBaseCost === undefined ||
+                h.providerBaseCost === null
+            ) {
                 set.providerBaseCost = 0;
             }
 
-            if (h.providerGst === undefined) {
+            if (
+                h.providerGst === undefined ||
+                h.providerGst === null
+            ) {
                 set.providerGst = 0;
             }
 
-            if (h.providerTotalCost === undefined) {
+            if (
+                h.providerTotalCost === undefined ||
+                h.providerTotalCost === null
+            ) {
                 set.providerTotalCost = 0;
             }
 
-            if (h.reservedAmount === undefined) {
+            if (
+                h.reservedAmount === undefined ||
+                h.reservedAmount === null
+            ) {
                 set.reservedAmount = 0;
             }
 
-            if (h.billingFinalized === undefined) {
+            if (
+                h.billingFinalized === undefined ||
+                h.billingFinalized === null
+            ) {
                 set.billingFinalized =
                     h.status === 'completed' ||
                     h.status === 'failed' ||
@@ -1871,54 +2041,71 @@ async function migrateDatabase() {
                     h.status === 'cancelled';
             }
 
-            if (h.status === undefined) {
-                set.status = 'completed';
+            if (!h.billingVersion) {
+                set.billingVersion =
+                    'legacy';
             }
 
-            if (h.date === undefined) {
+            if (
+                h.status === undefined ||
+                h.status === null
+            ) {
+                set.status =
+                    'completed';
+            }
+
+            if (
+                h.date === undefined ||
+                h.date === null
+            ) {
                 set.date =
                     h.createdAt ||
                     new Date();
             }
 
-            if (h.startedAt === undefined) {
+            if (
+                h.startedAt === undefined ||
+                h.startedAt === null
+            ) {
                 set.startedAt =
                     h.createdAt ||
                     h.date ||
                     new Date();
             }
 
-            if (h.callSid === undefined) {
+            if (
+                h.callSid === undefined
+            ) {
                 set.callSid = null;
             }
 
-            if (h.answeredAt === undefined) {
+            if (
+                h.answeredAt === undefined
+            ) {
                 set.answeredAt = null;
             }
 
-            if (h.endedAt === undefined) {
+            if (
+                h.endedAt === undefined
+            ) {
                 set.endedAt = null;
             }
 
-            if (h.edesyData === undefined) {
+            if (
+                h.edesyData === undefined
+            ) {
                 set.edesyData = null;
             }
 
             if (
-                Object.keys(set).length > 0 ||
-                Object.keys(unset).length > 0
+                Object.keys(set).length > 0
             ) {
                 await collection.updateOne(
                     {
                         _id: h._id
                     },
                     {
-                        ...(Object.keys(set).length > 0
-                            ? { $set: set }
-                            : {}),
-                        ...(Object.keys(unset).length > 0
-                            ? { $unset: unset }
-                            : {})
+                        $set: set
                     }
                 );
 
@@ -1926,80 +2113,20 @@ async function migrateDatabase() {
             }
         }
 
-        const userCollection =
-            User.collection;
-
-        const legacyUsers =
-            await userCollection.find({
-                minutes: {
-                    $exists: true
-                }
-            }).toArray();
-
-        let userUpdates = 0;
-
-        for (const user of legacyUsers) {
-            const legacyMinutes =
-                Number(user.minutes);
-
-            if (
-                Number.isFinite(legacyMinutes) &&
-                legacyMinutes > 0
-            ) {
-                const legacyBalance =
-                    Number(
-                        (
-                            legacyMinutes *
-                            USER_RATE_WITH_GST
-                        ).toFixed(2)
-                    );
-
-                const currentBalance =
-                    Number(user.balance || 0);
-
-                const update = {
-                    $inc: {
-                        balance:
-                            legacyBalance
-                    },
-                    $unset: {
-                        minutes: ''
-                    }
-                };
-
-                if (currentBalance < 0) {
-                    update.$set = {
-                        balance: 0
-                    };
-                    delete update.$inc;
-                }
-
-                await userCollection.updateOne(
-                    {
-                        _id: user._id
-                    },
-                    update
-                );
-
-                userUpdates++;
-            } else {
-                await userCollection.updateOne(
-                    {
-                        _id: user._id
-                    },
-                    {
-                        $unset: {
-                            minutes: ''
-                        }
-                    }
-                );
-
-                userUpdates++;
-            }
-        }
+        console.log(
+            `Legacy call histories updated: ${historyUpdates}`
+        );
 
         console.log(
-            `Database migration completed. History updates: ${historyUpdates}, User updates: ${userUpdates}`
+            'Existing user balances were NOT modified.'
+        );
+
+        console.log(
+            'Legacy minutes were NOT converted into balance.'
+        );
+
+        console.log(
+            'Old call costs were NOT repriced.'
         );
     } catch (error) {
         console.error(
@@ -2007,6 +2134,113 @@ async function migrateDatabase() {
             error.message
         );
     }
+}
+
+async function applyOneTimeBalanceCorrection() {
+    const email =
+        process.env.BALANCE_CORRECTION_EMAIL;
+
+    const amount =
+        Number(
+            process.env.BALANCE_CORRECTION_AMOUNT
+        );
+
+    if (
+        !email ||
+        !Number.isFinite(amount) ||
+        amount <= 0
+    ) {
+        return;
+    }
+
+    const key =
+        `balance_correction_${email.toLowerCase().trim()}_${amount}`;
+
+    const flags =
+        mongoose.connection.collection(
+            'migration_flags'
+        );
+
+    const alreadyApplied =
+        await flags.findOne({
+            key
+        });
+
+    if (alreadyApplied) {
+        console.log(
+            'Balance correction already applied.'
+        );
+
+        return;
+    }
+
+    const user =
+        await User.findOne({
+            email:
+                email.toLowerCase().trim()
+        });
+
+    if (!user) {
+        console.log(
+            'Balance correction user not found.'
+        );
+
+        return;
+    }
+
+    const currentBalance =
+        roundMoney(
+            user.balance
+        );
+
+    const correction =
+        roundMoney(
+            Math.min(
+                amount,
+                currentBalance
+            )
+        );
+
+    if (correction <= 0) {
+        return;
+    }
+
+    const updatedUser =
+        await User.findOneAndUpdate(
+            {
+                _id: user._id,
+                balance: {
+                    $gte: correction
+                }
+            },
+            {
+                $inc: {
+                    balance:
+                        -correction
+                }
+            },
+            {
+                new: true
+            }
+        );
+
+    if (!updatedUser) {
+        return;
+    }
+
+    await flags.insertOne({
+        key,
+        userId:
+            user._id,
+        amount:
+            correction,
+        createdAt:
+            new Date()
+    });
+
+    console.log(
+        `One-time balance correction applied: ₹${correction}`
+    );
 }
 
 async function startServer() {
@@ -2020,6 +2254,8 @@ async function startServer() {
         );
 
         await migrateDatabase();
+
+        await applyOneTimeBalanceCorrection();
 
         app.listen(
             PORT,
@@ -2041,6 +2277,10 @@ async function startServer() {
 
                 console.log(
                     `Edesy Rate: ₹${COMMISSION_PER_MINUTE}/minute + 18% GST = ₹${EDESY_RATE_WITH_GST}/minute`
+                );
+
+                console.log(
+                    'Safe balance migration enabled.'
                 );
             }
         );
