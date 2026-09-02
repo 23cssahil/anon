@@ -335,6 +335,37 @@ app.post('/auth/google-login', loginLimiter, async (req, res) => {
     }
 });
 
+// ============== ADD RECHARGE / WALLET ROUTE ==============
+app.post('/api/add-recharge', authenticateToken, async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const userId = req.user.userId;
+
+        const addAmount = Number(amount);
+        if (!addAmount || addAmount <= 0) {
+            return res.status(400).json({ error: 'Valid recharge amount required' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Balance update karein
+        user.balance = Number((user.balance + addAmount).toFixed(2));
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Recharge successful!',
+            newBalance: user.balance
+        });
+    } catch (error) {
+        console.error('Recharge error:', error.message);
+        res.status(500).json({ error: 'Server error during recharge' });
+    }
+});
+
 // ============== BALANCE ==============
 app.get('/api/balance/:userId', authenticateToken, async (req, res) => {
     try {
@@ -522,7 +553,7 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             }
             return res.status(400).json({ error: errorMsg });
         }
-        
+
         // ========== BILLING LOGIC ==========
         let billedMinutes = 1; 
         if (actualSecs > 0) {
