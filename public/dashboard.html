@@ -44,11 +44,11 @@
                 <div class="hint-box">
                     <strong>📱 Steps to Recharge:</strong><br>
                     1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
-                    2. Enter amount paid and correct PhonePe Transaction ID (UTR) below. Faltu ya duplicate ID accept nahi hogi.
+                    2. UTR daalne ke baad recharge <b>Pending</b> rahega. Jaise hi aapke paise milenge, Admin approve karega aur minutes add ho jayenge!
                 </div>
                 <input type="number" id="recharge-amount" placeholder="Enter amount paid in ₹ (Min ₹10)" min="10">
                 <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID / UTR">
-                <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Verify & Add Minutes</button>
+                <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Submit Recharge Request</button>
             </div>
 
             <!-- Call Section -->
@@ -147,8 +147,7 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(`Recharge successful! Added ${data.addedMinutes} Minutes.`);
-                    document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
+                    alert(data.message);
                     document.getElementById('recharge-amount').value = '';
                     document.getElementById('txn-id').value = '';
                 } else { alert(data.error); }
