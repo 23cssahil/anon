@@ -81,6 +81,16 @@
             margin-bottom: 15px; 
             line-height: 1.5;
         }
+        .instruction-box {
+            background: #fff8e1;
+            border-left: 4px solid #fbc02d;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #5d4037;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
         label { 
             font-size: 14px; 
             font-weight: bold; 
@@ -118,7 +128,6 @@
             font-weight: bold; 
         }
         
-        /* Desktop optimization: max width with centered layout if screen is very wide */
         @media (min-width: 768px) {
             .container {
                 max-width: 750px;
@@ -193,6 +202,15 @@
                 
                 <button onclick="makeCall()" style="background: #137333; margin-top: 15px;">Call Now</button>
                 <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px; text-align: center;"></p>
+
+                <!-- Call Instructions Box -->
+                <div class="instruction-box">
+                    <strong>📌 Call Kaise Lagegi (Instructions):</strong><br>
+                    1. Jab aap <b>"Call Now"</b> par click karenge, toh sabse pehle <b>aapke phone par</b> ek incoming call aayegi.<br>
+                    2. Jaise hi aap apna phone uthayenge (receive karenge), system turant us call ko target ke number se connect kar dega.<br>
+                    3. Target wale ki screen par aapka asli number nahi dikhega, balki ek virtual/masked random number show hoga.<br>
+                    4. Selected time (duration) poora hote hi call apne aap cut ho jayegi.
+                </div>
             </div>
 
             <!-- History Section with Tap & Hold Delete -->
