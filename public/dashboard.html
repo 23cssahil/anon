@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Anonymous Call</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .section { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .recharge-group { display: flex; gap: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <h2>User Dashboard</h2>
+        
+        <div id="login-section" class="section">
+            <h3>Login to Continue</h3>
+            <button onclick="mockLogin()">Sign in with Google (Demo)</button>
+        </div>
+
+        <div id="dashboard-section" style="display:none;">
+            <div class="section">
+                <h3 id="welcome-msg">Hello, User</h3>
+                <p><strong>Token Balance:</strong> <span id="token-count">0</span> Tokens</p>
+            </div>
+
+            <div class="section">
+                <h3>Recharge Tokens</h3>
+                <div class="recharge-group">
+                    <button onclick="recharge(50)">₹50 (50 Tkn)</button>
+                    <button onclick="recharge(100)">₹100 (100 Tkn)</button>
+                    <button onclick="recharge(500)">₹500 (500 Tkn)</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Make an Anonymous Call</h3>
+                <input type="text" id="phone-number" placeholder="Enter 10-digit mobile number" maxlength="10">
+                <button onclick="makeCall()" style="background: #28a745;">Call Now</button>
+                <p id="call-status" style="font-weight: bold; color: #555;"></p>
+            </div>
+
+            <div class="section">
+                <h3>Call History</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Number</th>
+                            <th>Duration</th>
+                            <th>Tokens</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userId = localStorage.getItem('userId');
+
+        if (userId) {
+            loadDashboard();
+        }
+
+        async function mockLogin() {
+            const res = await fetch('/auth/google-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: 'test@gmail.com', name: 'Rahul Sharma', googleId: '123456789' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                localStorage.setItem('userId', data.user._id);
+                userId = data.user._id;
+                loadDashboard();
+            }
+        }
+
+        async function loadDashboard() {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = 'block';
+
+            const res = await fetch(`/api/balance/${userId}`);
+            const data = await res.json();
+            document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
+            document.getElementById('token-count').innerText = data.tokens;
+
+            loadHistory();
+        }
+
+        function recharge(amount) {
+            alert(`Redirecting to Edesy Payment Gateway for ₹${amount}...`);
+            window.location.href = `https://edesy.com/pay?amount=${amount}&user=${userId}`;
+        }
+
+        async function makeCall() {
+            const phoneNumber = document.getElementById('phone-number').value;
+            const statusEl = document.getElementById('call-status');
+
+            if (phoneNumber.length !== 10 || isNaN(phoneNumber)) {
+                alert('Please enter a valid 10-digit Indian phone number.');
+                return;
+            }
+
+            statusEl.innerText = "Connecting via Edesy Masking API...";
+
+            const res = await fetch('/api/call', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, phoneNumber })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                statusEl.innerText = "Call Connected! Active...";
+                document.getElementById('token-count').innerText = data.remainingTokens;
+                loadHistory();
+            } else {
+                statusEl.innerText = data.error;
+            }
+        }
+
+        async function loadHistory() {
+            const res = await fetch(`/api/history/${userId}`);
+            const history = await res.json();
+            const tbody = document.getElementById('history-table');
+            tbody.innerHTML = '';
+            history.forEach(item => {
+                tbody.innerHTML += `<tr>
+                    <td>${item.phoneNumber}</td>
+                    <td>${item.duration}</td>
+                    <td>${item.tokensUsed}</td>
+                    <td>${new Date(item.date).toLocaleDateString()}</td>
+                </tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
