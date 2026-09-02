@@ -553,29 +553,6 @@ function openPhonePeApp() {
     }, 1500);
 }
 </script>
-
-document.addEventListener("DOMContentLoaded", function() {
-    const scanPayBtn = document.getElementById('scan-pay-btn');
-    if (scanPayBtn) {
-        scanPayBtn.addEventListener('click', function(e) {
-            const amountInput = document.getElementById('recharge-amount').value;
-            const amount = Number(amountInput);
-
-            if (!amount || amount < 3) {
-                e.preventDefault(); // Amount kam hone par link khulne se rok dega
-                alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
-                return;
-            }
-
-            // Dynamic UPI URL banana
-            const upiUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-            
-            // Direct link mein href set kar dena taaki browser block na kare
-            this.href = upiUrl;
-        });
-    }
-});
-
             <!-- Make Call Card -->
             <div class="card">
                 <h2><i class="fas fa-phone"></i> Make Anonymous Call</h2>
@@ -648,6 +625,26 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
 
     <script>
+        function openPhonePeApp() {
+            const amountInput = document.getElementById('recharge-amount').value;
+            const amount = Number(amountInput);
+
+            if (!amount || amount < 3) {
+                alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
+                return;
+            }
+
+            const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+            
+            // Try to open UPI app, with a fallback
+            window.location.href = upiPayUrl;
+            
+            // Fallback message agar app trigger na ho
+            setTimeout(() => {
+                alert('Agar UPI app nahi khuli, toh aap niche diye gaye QR Code ko screenshot lekar ya gallery se scan karke payment kar sakte hain!');
+            }, 1500);
+        }
+
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
@@ -768,7 +765,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
 
-       // Check Pool Status (Modified to keep buttons always enabled)
+       // Check Pool Status
         async function checkPoolStatus() {
             try {
                 const response = await fetch('/api/pool-status');
@@ -780,17 +777,17 @@ document.addEventListener("DOMContentLoaded", function() {
                 const rechargeInput = document.getElementById('recharge-amount');
                 const poolWarning = document.getElementById('pool-warning');
 
-                // Buttons ko hamesha enabled rakhein, chahe pool empty ho ya na ho
-                payBtn.disabled = false;
-                addMinBtn.disabled = false;
-                rechargeInput.disabled = false;
+                if (payBtn) payBtn.disabled = false;
+                if (addMinBtn) addMinBtn.disabled = false;
+                if (rechargeInput) rechargeInput.disabled = false;
                 
-                // Warning message sirf info ke liye dikhega, par blocking nahi hogi
-                if (currentAvailablePool <= 0) {
-                    poolWarning.style.display = 'block';
-                    poolWarning.innerHTML = `<strong>ℹ️ Notice:</strong> Pool is currently ₹${currentAvailablePool.toFixed(2)}, but you can still recharge.`;
-                } else {
-                    poolWarning.style.display = 'none';
+                if (poolWarning) {
+                    if (currentAvailablePool <= 0) {
+                        poolWarning.style.display = 'block';
+                        poolWarning.innerHTML = `<strong>ℹ️ Notice:</strong> Pool is currently ₹${currentAvailablePool.toFixed(2)}, but you can still recharge.`;
+                    } else {
+                        poolWarning.style.display = 'none';
+                    }
                 }
             } catch (error) {
                 console.error('Pool status error:', error);
@@ -814,17 +811,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('gst-display').innerText = `Total: ₹${calculatedTotal.toFixed(2)}`;
                 document.getElementById('add-min-btn').disabled = false;
             }
-        }
-
-        // Pay via PhonePe
-        function payViaPhonePe() {
-            const amount = Number(document.getElementById('recharge-amount').value) || 0;
-            if (amount < 3) {
-                showAlert('Minimum amount is ₹3');
-                return;
-            }
-            const upiUrl = `upi://pay?pa=8423609308@ybl&pn=AnonymousCall&am=${amount.toFixed(2)}&cu=INR`;
-            window.location.href = upiUrl;
         }
 
         // Add Balance
