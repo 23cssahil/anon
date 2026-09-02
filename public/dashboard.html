@@ -800,50 +800,32 @@ function openPhonePeApp(event) {
 
        // Calculate Amount
 function calculateGst() {
-    const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
+            const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
 
-    if (baseAmount <= 0) {
-        document.getElementById('gst-display').innerText = 'Total: ₹0.00';
-        const addBtn = document.getElementById('add-min-btn');
-        if (addBtn) addBtn.disabled = true;
-        return;
-    }
+            if (baseAmount <= 0) {
+                document.getElementById('gst-display').innerText = 'Total: ₹0.00';
+                const addBtn = document.getElementById('add-min-btn');
+                if (addBtn) addBtn.disabled = true;
+                return;
+            }
 
-    // 18% GST Calculation (Yeh hissa aage jurna zaroori hai)
-    const gstAmount = baseAmount * 0.18;
-    const totalAmount = baseAmount + gstAmount;
-    const minutes = baseAmount / 3;
+            // 18% GST Calculation (Yeh ab function ke andar hai, toh error nahi aayega)
+            const gstAmount = baseAmount * 0.18;
+            const totalAmount = baseAmount + gstAmount;
+            const minutes = baseAmount / 3;
 
-    // Display update karein
-    const gstDisplay = document.getElementById('gst-display');
-    if (gstDisplay) {
-        gstDisplay.innerHTML = `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br><b style="color: #28a745;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br><small style="color: #5f259f;">Talktime: ${minutes.toFixed(1)} Minutes</small>`;
-    }
+            // Display update karein
+            const gstDisplay = document.getElementById('gst-display');
+            if (gstDisplay) {
+                gstDisplay.innerHTML = `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br><b style="color: #28a745;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br><small style="color: #5f259f;">Talktime: ${minutes.toFixed(1)} Minutes</small>`;
+            }
 
-    // Button enable karein
-    const addBtn = document.getElementById('add-min-btn');
-    if (addBtn) {
-        addBtn.disabled = false;
-    }
-}
-
-    // 18% GST Calculation
-    const gstAmount = baseAmount * 0.18;
-    const totalAmount = baseAmount + gstAmount; // Yeh amount user PhonePe par pay karega
-    const minutes = baseAmount / 3;             // ₹3 per minute ke hisaab se minutes
-
-    // UI par Base, GST, Total aur Minutes dikhayein
-    const gstDisplay = document.getElementById('gst-display');
-    if (gstDisplay) {
-        gstDisplay.innerHTML = `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br><b style="color: #28a745;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br><small style="color: #5f259f;">Talktime: ${minutes.toFixed(1)} Minutes</small>`;
-    }
-
-    // Button enable kar dein agar amount valid hai
-    const addBtn = document.getElementById('add-min-btn');
-    if (addBtn) {
-        addBtn.disabled = false;
-    }
-
+            // Button enable karein
+            const addBtn = document.getElementById('add-min-btn');
+            if (addBtn) {
+                addBtn.disabled = false;
+            }
+        }
         // Add Balance
         async function confirmAndAddMinutes() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
