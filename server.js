@@ -471,9 +471,9 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Pehle Terms of Service accept karni hongi.' });
         }
 
-        if (!user.verifiedPhone) {
-            return res.status(400).json({ error: 'Pehle apna mobile number OTP se verify karo!' });
-        }
+        // if (!user.verifiedPhone) {
+        //     return res.status(400).json({ error: 'Pehle apna mobile number OTP se verify karo!' });
+        // }
 
         const decryptedPhone = decryptSensitiveData(user.verifiedPhone);
         if (!decryptedPhone) {
