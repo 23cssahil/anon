@@ -45,6 +45,11 @@ const rechargeLimiter = rateLimit({
     legacyHeaders: false
 });
 
+// ============== PRICING CONFIGURATION ==============
+const CALL_RATE_PER_MINUTE = 3.00; // ₹3 per minute (for user display)
+const COMMISSION_PER_MINUTE = 1.50; // ₹1.50 commission per minute
+const ACTUAL_RATE_PER_MINUTE = CALL_RATE_PER_MINUTE; // What user pays = ₹3/min
+
 // ============== AUTHENTICATION MIDDLEWARE ==============
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -115,17 +120,17 @@ if (!mongoUri) {
 mongoose.connect(mongoUri).then(async () => {
     console.log('MongoDB Connected');
     try {
-        // Migrate Call History to 60s pulse with minimum ₹1.50 billing
+        // Migrate Call History to ₹3/minute with minimum ₹3 billing
         const histories = await CallHistory.find({});
         for (let h of histories) {
             let actualSecs = h.durationSeconds || Math.round((h.durationMinutes || 0) * 60);
             if (actualSecs <= 0 && h.cost) {
-                actualSecs = Math.round((h.cost / 1.50) * 60);
+                actualSecs = Math.round((h.cost / ACTUAL_RATE_PER_MINUTE) * 60);
             }
             
-            // BILLING LOGIC: Minimum 1 minute (60s pulse) = ₹1.50
+            // BILLING LOGIC: Minimum 1 minute (60s pulse) = ₹3
             const billedMinutes = actualSecs > 0 ? Math.ceil(actualSecs / 60) : 1;
-            const exactCost = Number((billedMinutes * 1.50).toFixed(2));
+            const exactCost = Number((billedMinutes * ACTUAL_RATE_PER_MINUTE).toFixed(2));
 
             if (h.cost !== exactCost || h.durationMinutes !== billedMinutes) {
                 h.durationMinutes = billedMinutes;
@@ -139,7 +144,7 @@ mongoose.connect(mongoUri).then(async () => {
         const users = await User.find({});
         for (let u of users) {
             if (u.minutes !== undefined && u.minutes > 0 && u.balance === 0) {
-                u.balance = Number((u.minutes * 1.50).toFixed(2));
+                u.balance = Number((u.minutes * ACTUAL_RATE_PER_MINUTE).toFixed(2));
                 u.minutes = undefined;
                 await u.save();
             }
@@ -179,7 +184,7 @@ const callSchema = new mongoose.Schema({
     targetPhone: { type: String, required: true },
     durationMinutes: { type: Number, required: true, min: 1 },
     durationSeconds: { type: Number, required: true, min: 0 },
-    cost: { type: Number, required: true, min: 1.50 }, // Minimum ₹1.50 per call
+    cost: { type: Number, required: true, min: 3.00 }, // Minimum ₹3 per call
     clientIp: String,
     userAgent: String,
     date: { type: Date, default: Date.now, index: true }
@@ -236,7 +241,7 @@ async function getTotalAssignedPoolRupees() {
 app.get('/api/pool-status', async (req, res) => {
     try {
         const edesyTotalMins = await getEdesyBalance();
-        const edesyTotalRupees = edesyTotalMins * 1.50;
+        const edesyTotalRupees = edesyTotalMins * COMMISSION_PER_MINUTE;
         const assignedRupees = await getTotalAssignedPoolRupees();
         const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
         res.json({ edesyTotalRupees, assignedRupees, availablePoolRupees });
@@ -251,6 +256,7 @@ app.post('/auth/google-login', loginLimiter, async (req, res) => {
     try {
         const { email, name, googleId, termsAccepted } = req.body;
 
+        // Validation
         if (!email || !validateEmail(email)) {
             return res.status(400).json({ error: 'Invalid email format' });
         }
@@ -289,8 +295,9 @@ app.post('/auth/google-login', loginLimiter, async (req, res) => {
             }
         }
 
+        // Generate JWT Token
         const token = jwt.sign(
-            { userId: user._id, email: user.email },
+            { userId: user._id.toString(), email: user.email },
             process.env.JWT_SECRET || 'your-secret-key-change-in-env',
             { expiresIn: '7d' }
         );
@@ -299,7 +306,7 @@ app.post('/auth/google-login', loginLimiter, async (req, res) => {
             success: true,
             token,
             user: {
-                userId: user._id,
+                userId: user._id.toString(),
                 name: user.name,
                 email: user.email,
                 balance: user.balance,
@@ -308,7 +315,7 @@ app.post('/auth/google-login', loginLimiter, async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error.message);
-        res.status(500).json({ error: 'Server error during login' });
+        res.status(500).json({ error: 'Server error during login: ' + error.message });
     }
 });
 
@@ -409,12 +416,12 @@ app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, re
         const userId = req.user.userId;
 
         const amount = Number(baseAmount);
-        if (!amount || amount < 1.50 || amount > 10000) {
-            return res.status(400).json({ error: 'Recharge amount ₹1.50 to ₹10,000 ke beech hona chahiye.' });
+        if (!amount || amount < ACTUAL_RATE_PER_MINUTE || amount > 10000) {
+            return res.status(400).json({ error: `Recharge amount ₹${ACTUAL_RATE_PER_MINUTE} to ₹10,000 ke beech hona chahiye.` });
         }
 
         const edesyTotalMins = await getEdesyBalance();
-        const edesyTotalRupees = edesyTotalMins * 1.50;
+        const edesyTotalRupees = edesyTotalMins * COMMISSION_PER_MINUTE;
         const assignedRupees = await getTotalAssignedPoolRupees();
         const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
 
@@ -479,15 +486,14 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(500).json({ error: 'Phone number decryption error' });
         }
 
-        const ratePerPulse = 1.50;
-
-        if (user.balance < ratePerPulse) {
+        // Minimum ₹3 required
+        if (user.balance < ACTUAL_RATE_PER_MINUTE) {
             return res.status(400).json({
-                error: 'Wallet balance khatam! Kripya recharge karein (Minimum ₹1.50 required).'
+                error: `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
             });
         }
 
-        let maxAllowedMinutes = Math.floor(user.balance / ratePerPulse);
+        let maxAllowedMinutes = Math.floor(user.balance / ACTUAL_RATE_PER_MINUTE);
         if (maxAllowedMinutes < 1) maxAllowedMinutes = 1;
 
         let durationLimitMinutes = maxAllowedMinutes;
@@ -496,12 +502,6 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             if (!isNaN(requestedMins) && requestedMins > 0 && requestedMins < durationLimitMinutes) {
                 durationLimitMinutes = requestedMins;
             }
-        }
-
-        if (user.balance < ratePerPulse) {
-            return res.status(400).json({
-                error: `Insufficient balance. Required: ₹${ratePerPulse.toFixed(2)}`
-            });
         }
 
         if (!process.env.EDESY_API_KEY) {
@@ -526,16 +526,15 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
         }
 
-        // ========== BILLING LOGIC: FIXED 60-SECOND PULSE ==========
-        // Minimum 1 minute = ₹1.50 (even if call is 5 seconds or 59 seconds)
-        // Every call = ₹1.50 minimum
+        // ========== BILLING LOGIC: ₹3 PER MINUTE ==========
+        // Minimum 1 minute = ₹3 (even if call is 5 seconds or 59 seconds)
         let billedMinutes = 1; // Minimum 1 minute
         
         if (actualSecs > 0) {
             billedMinutes = Math.ceil(actualSecs / 60); // Round up to next minute
         }
 
-        const callCost = Number((billedMinutes * ratePerPulse).toFixed(2));
+        const callCost = Number((billedMinutes * ACTUAL_RATE_PER_MINUTE).toFixed(2));
 
         // Deduct from wallet
         user.balance = Math.max(0, Number((user.balance - callCost).toFixed(2)));
@@ -616,4 +615,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Call Rate: ₹${ACTUAL_RATE_PER_MINUTE}/minute | Commission: ₹${COMMISSION_PER_MINUTE}/minute`);
 });
