@@ -103,7 +103,14 @@ function encryptSensitiveData(data) {
 }
 
 function decryptSensitiveData(data) {
+    if (!data) return null;
+    
     try {
+        // Agar data mein ':' nahi hai, iska matlab woh encrypted nahi balki plain text hai
+        if (!data.includes(':')) {
+            return data; 
+        }
+
         const algorithm = 'aes-256-cbc';
         const secretKey = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-secret-key', 'salt', 32);
         const parts = data.split(':');
@@ -113,8 +120,9 @@ function decryptSensitiveData(data) {
         decrypted += decipher.final('utf8');
         return decrypted;
     } catch (err) {
-        console.error('Decryption error:', err);
-        return null;
+        // Agar decryption fail bhi ho jaye, toh error fekne ke bajaye raw data return kar dega
+        console.warn('Decryption fallback to raw data:', err.message);
+        return data;
     }
 }
 
