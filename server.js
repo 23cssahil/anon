@@ -9,10 +9,7 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.static('public'));
 
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(async () => {
+mongoose.connect(process.env.MONGO_URI).then(async () => {
     console.log('MongoDB Connected');
     try {
         // 1. Migrate Call History to 60s pulse (₹1.50 per minute flat block)
