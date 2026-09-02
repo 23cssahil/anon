@@ -505,7 +505,7 @@
         <strong>📱 Instant Pay:</strong><br>
         1. Amount enter karein.<br>
         2. <strong>"Scan & Pay via PhonePe"</strong> button par click karein.<br>
-        3. Ya phir QR code scan karke payment karein (UPI: <strong>8423609308@ybl</strong>).
+        3. QR code se payment karein (UPI: <strong>8423609308@ybl</strong>).
     </div>
 
     <!-- QR Code Image -->
@@ -528,7 +528,7 @@
 
 <!-- Confirm Balance Button -->
 <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px; width: 100%; background: #28a745; color: white; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
-    <i class="fas fa-check"></i> Payment Hone ke Baad Yahan Click Karein (Confirm & Add)
+    <i class="fas fa-check"></i> Payment Status Check Karein
 </button>
 <script>
 // 1. Jaise hi user amount type karega, link set ho jayega
@@ -629,26 +629,6 @@ function openPhonePeApp(event) {
     </div>
 
     <script>
-        function openPhonePeApp() {
-            const amountInput = document.getElementById('recharge-amount').value;
-            const amount = Number(amountInput);
-
-            if (!amount || amount < 3) {
-                alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
-                return;
-            }
-
-            const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-            
-            // Try to open UPI app, with a fallback
-            window.location.href = upiPayUrl;
-            
-            // Fallback message agar app trigger na ho
-            setTimeout(() => {
-                alert('Agar UPI app nahi khuli, toh aap niche diye gaye QR Code ko screenshot lekar ya gallery se scan karke payment kar sakte hain!');
-            }, 1500);
-        }
-
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
@@ -666,6 +646,23 @@ function openPhonePeApp(event) {
         let calculatedTotal = 0;
         let currentAvailablePool = 0;
         let modalCallback = null;
+
+        function authHeaders(includeJson = false) {
+            const headers = {
+                'Authorization': `Bearer ${userToken}`
+            };
+            if (includeJson) headers['Content-Type'] = 'application/json';
+            return headers;
+        }
+
+        function handleUnauthorized(response) {
+            if (response.status === 401 || response.status === 403) {
+                showAlert('Session expired. Please login again.');
+                setTimeout(logout, 300);
+                return true;
+            }
+            return false;
+        }
 
         // Check if already logged in
         window.addEventListener('load', () => {
@@ -749,7 +746,7 @@ function openPhonePeApp(event) {
 
             try {
                 const response = await fetch(`/api/balance/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${userToken}` }
+                    headers: authHeaders()
                 });
 
                 const data = await response.json();
@@ -760,8 +757,8 @@ function openPhonePeApp(event) {
                     loadHistory();
                     checkPoolStatus();
                 } else {
-                    showAlert('Session expired. Please login again.');
-                    logout();
+                    if (handleUnauthorized(response)) return;
+                    showAlert(data.error || 'Unable to load account.');
                 }
             } catch (error) {
                 console.error('Error loading dashboard:', error);
@@ -826,42 +823,56 @@ function calculateGst() {
                 addBtn.disabled = false;
             }
         }
-        // Add Balance
+        // Payment confirmation
         async function confirmAndAddMinutes() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
-            if (amount < 3) {
-                showAlert('Enter valid amount (min ₹3)');
+
+            if (amount < 3 || !Number.isFinite(amount)) {
+                showAlert('Enter a valid amount (minimum ₹3).');
                 return;
             }
 
-            showConfirm(`Confirm adding ₹${amount.toFixed(2)} to balance?`, async (confirmed) => {
-                if (!confirmed) return;
+            const totalAmount = Number((amount * 1.18).toFixed(2));
 
-                try {
-                    const response = await fetch('/api/add-recharge', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${userToken}`
-                        },
-                        body: JSON.stringify({ amount: amount })
-                    });
+            showConfirm(
+                `Payment of ₹${totalAmount.toFixed(2)} complete hone ke baad hi balance add hoga. Continue?`,
+                async (confirmed) => {
+                    if (!confirmed) return;
 
-                    const data = await response.json();
-                    if (response.ok) {
-                        showAlert('✅ Balance added successfully!');
-                        const newBalance = Number(data.newBalance || 0);
-                        document.getElementById('balance-amount').innerText = newBalance.toFixed(2);
-                        document.getElementById('recharge-amount').value = '';
-                        document.getElementById('gst-display').innerText = 'Total: ₹0.00';
-                        checkPoolStatus();
-                    } else {
-                        showAlert('❌ ' + (data.error || 'Error adding balance'));
+                    try {
+                        const response = await fetch('/api/add-recharge', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${userToken}`
+                            },
+                            body: JSON.stringify({ amount: amount })
+                        });
+
+                        const data = await response.json().catch(() => ({}));
+
+                        if (response.ok) {
+                            showAlert('✅ Recharge request accepted.');
+                            if (typeof data.newBalance === 'number') {
+                                document.getElementById('balance-amount').innerText =
+                                    data.newBalance.toFixed(2);
+                            }
+                            document.getElementById('recharge-amount').value = '';
+                            document.getElementById('gst-display').innerText = 'Total: ₹0.00';
+                            checkPoolStatus();
+                        } else if (response.status === 503) {
+                            showAlert(
+                                '⚠️ Payment verification is not enabled yet. ' +
+                                'UPI payment hone ke baad balance automatically add nahi hoga.'
+                            );
+                        } else {
+                            showAlert('❌ ' + (data.error || 'Recharge could not be processed.'));
+                        }
+                    } catch (error) {
+                        showAlert('❌ Network error: ' + error.message);
                     }
-                } catch (error) {
-                    showAlert('Error: ' + error.message);
                 }
-            });
+            );
         }
 
         // Make Call
@@ -870,12 +881,19 @@ function calculateGst() {
             const targetPhone = document.getElementById('phone-number').value.trim();
             const maxDuration = document.getElementById('max-duration').value;
             const statusEl = document.getElementById('call-status');
+            const callBtn = document.querySelector('button[onclick="makeCall()"]');
 
-            if (userPhone.length !== 10 || targetPhone.length !== 10) {
+            if (!/^\d{10}$/.test(userPhone) || !/^\d{10}$/.test(targetPhone)) {
                 showAlert('Please enter valid 10-digit numbers');
                 return;
             }
 
+            if (userPhone === targetPhone) {
+                showAlert('Your number and target number cannot be the same.');
+                return;
+            }
+
+            if (callBtn) callBtn.disabled = true;
             statusEl.style.display = 'block';
             statusEl.className = 'call-status status-info';
             statusEl.innerText = '📞 Initiating call...';
@@ -883,12 +901,10 @@ function calculateGst() {
             try {
                 const response = await fetch('/api/call', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userToken}`
-                    },
+                    headers: authHeaders(true),
                     body: JSON.stringify({
                         userId,
+                        userPhone,
                         phoneNumber: targetPhone,
                         maxDuration
                     })
@@ -901,7 +917,7 @@ function calculateGst() {
                     const remainingBalance = Number(data.remainingBalance || 0);
 
                     statusEl.className = 'call-status status-success';
-                    statusEl.innerText = `✅ Call completed! Duration: ${duration} min | Cost: ₹${cost.toFixed(2)}`;
+                    statusEl.innerText = `✅ Call started! Reserved: ${duration} min | Cost: ₹${cost.toFixed(2)}`;
                     document.getElementById('balance-amount').innerText = remainingBalance.toFixed(2);
                     
                     setTimeout(() => {
@@ -909,12 +925,15 @@ function calculateGst() {
                         statusEl.style.display = 'none';
                     }, 2000);
                 } else {
+                    if (handleUnauthorized(response)) return;
                     statusEl.className = 'call-status status-error';
                     statusEl.innerText = '❌ ' + (data.error || 'Call failed');
                 }
             } catch (error) {
                 statusEl.className = 'call-status status-error';
                 statusEl.innerText = '❌ Error: ' + error.message;
+            } finally {
+                if (callBtn) callBtn.disabled = false;
             }
         }
 
@@ -922,9 +941,10 @@ function calculateGst() {
         async function loadHistory() {
             try {
                 const response = await fetch(`/api/history/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${userToken}` }
+                    headers: authHeaders()
                 });
 
+                if (handleUnauthorized(response)) return;
                 const history = await response.json();
                 const tbody = document.getElementById('history-table');
                 tbody.innerHTML = '';
@@ -944,9 +964,13 @@ function calculateGst() {
                     const cost = Number(item.cost || 0);
                     const date = item.date ? new Date(item.date).toLocaleDateString() : '';
 
+                    const safeTargetPhone = String(targetPhone).replace(/[&<>"']/g, char => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                    }[char]));
+
                     tr.innerHTML = `
-                        <td><strong>${targetPhone}</strong></td>
-                        <td>${duration} min</td>
+                        <td><strong>${safeTargetPhone}</strong></td>
+                        <td>${Number(duration) || 0} min</td>
                         <td>₹${cost.toFixed(2)}</td>
                         <td>${date}</td>
                     `;
@@ -977,10 +1001,12 @@ function calculateGst() {
 
         // Delete History
         async function deleteHistory(historyId) {
+            if (!historyId) return;
+
             try {
                 const response = await fetch(`/api/history/${historyId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${userToken}` }
+                    headers: authHeaders()
                 });
 
                 if (response.ok) {

@@ -398,6 +398,11 @@
     </style>
 </head>
 <body>
+    <script>
+        function openDashboard() {
+            window.location.href = '/dashboard.html';
+        }
+    </script>
 
     <!-- Navigation Bar -->
     <div class="navbar">
@@ -409,7 +414,7 @@
             <a href="#features">Features</a>
             <a href="#how">How It Works</a>
             <a href="#pricing">Pricing</a>
-            <button class="cta-btn" onclick="window.location.href='/dashboard.html'">
+            <button class="cta-btn" onclick="openDashboard()">
                 <i class="fas fa-arrow-right"></i> Dashboard
             </button>
         </div>
@@ -421,14 +426,14 @@
             <div class="hero-content">
                 <h1>Call Anyone Privately</h1>
                 <p>Your real number stays hidden. Recipient sees a masked number instead.</p>
-                <div class="hero-pricing">₹1.50/minute</div>
+                <div class="hero-pricing">₹3/minute</div>
                 <p style="font-size: 14px; opacity: 0.9;">No hidden charges • 60-second pulse billing • Instant setup</p>
-                <button class="hero-btn" onclick="window.location.href='/dashboard.html'">
+                <button class="hero-btn" onclick="openDashboard()">
                     <i class="fas fa-play-circle"></i> Start Making Calls
                 </button>
             </div>
             <div class="hero-image">
-                <i class="fas fa-mobile-alt"></i>
+                <i class="fas fa-mobile-alt" aria-hidden="true"></i>
             </div>
         </div>
     </div>
@@ -451,7 +456,7 @@
                         <i class="fas fa-money-bill-wave"></i>
                     </div>
                     <h3>Transparent Pricing</h3>
-                    <p>Simple, honest pricing at ₹1.50 per minute. No hidden charges, no surprise fees, no subscriptions.</p>
+                    <p>Simple, honest pricing at ₹3 per minute. No hidden charges, no surprise fees, no subscriptions.</p>
                 </div>
 
                 <div class="feature-card">
@@ -459,12 +464,12 @@
                         <i class="fas fa-lock"></i>
                     </div>
                     <h3>Bank-Level Security</h3>
-                    <p>Military-grade encryption protects all your data. Your privacy is our highest priority.</p>
+                    <p>Security controls are applied to protect account and call-related data.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-mobile-alt"></i>
+                        <i class="fas fa-mobile-alt" aria-hidden="true"></i>
                     </div>
                     <h3>No App Required</h3>
                     <p>Use directly from your browser on any device. No installation, no downloads, no storage space wasted.</p>
@@ -497,13 +502,13 @@
                 <div class="step">
                     <div class="step-number">1</div>
                     <h3>Sign In</h3>
-                    <p>Login using your Google account. Takes just a few seconds and is completely secure.</p>
+                    <p>Login using your Google account. Takes just a few seconds.</p>
                 </div>
 
                 <div class="step">
                     <div class="step-number">2</div>
                     <h3>Add Balance</h3>
-                    <p>Recharge your wallet via PhonePe UPI. Minimum amount is just ₹1.50.</p>
+                    <p>Recharge your wallet via PhonePe UPI. Minimum recharge amount is ₹3.</p>
                 </div>
 
                 <div class="step">
@@ -527,7 +532,7 @@
                 <div class="step">
                     <div class="step-number">6</div>
                     <h3>Auto Disconnect</h3>
-                    <p>Call automatically disconnects when time expires. You're only charged for actual talk time.</p>
+                    <p>Call automatically disconnects when time expires. Billing follows the platform's configured minute/pulse policy.</p>
                 </div>
             </div>
         </div>
@@ -538,7 +543,7 @@
         <div class="container">
             <h2 class="section-title" id="pricing">Simple Transparent Pricing</h2>
             <div class="pricing-card">
-                <h3>₹1.50</h3>
+                <h3>₹3</h3>
                 <p>per minute</p>
                 <div class="price-detail">
                     <strong>60-second pulse billing</strong><br>
@@ -550,7 +555,7 @@
                     ✓ No hidden charges<br>
                     ✓ No subscriptions
                 </div>
-                <button class="hero-btn" style="margin-top: 20px; width: 100%;" onclick="window.location.href='/dashboard.html'">
+                <button class="hero-btn" style="margin-top: 20px; width: 100%;" onclick="openDashboard()">
                     Start Now
                 </button>
             </div>
@@ -562,7 +567,7 @@
         <div class="cta-section">
             <h2>Ready to Make Private Calls?</h2>
             <p>Start calling anonymously in seconds. No setup required.</p>
-            <button onclick="window.location.href='/dashboard.html'">
+            <button onclick="openDashboard()">
                 <i class="fas fa-play-circle"></i> Open Dashboard
             </button>
         </div>
@@ -571,11 +576,11 @@
     <!-- Footer -->
     <div class="footer">
         <h4>Anonymous Call Platform</h4>
-        <p>Private calling with masked caller ID | ₹1.50/minute | No hidden charges</p>
+        <p>Private calling with masked caller ID | ₹3/minute | No hidden charges</p>
         <div class="footer-links">
-            <a href="#privacy">Privacy Policy</a>
-            <a href="#terms">Terms of Service</a>
-            <a href="#contact">Contact Us</a>
+            <a href="#privacy" onclick="return false;">Privacy Policy</a>
+            <a href="#terms" onclick="return false;">Terms of Service</a>
+            <a href="#contact" onclick="return false;">Contact Us</a>
         </div>
         <p style="margin-top: 30px; font-size: 12px; border-top: 1px solid #333; padding-top: 20px;">
             This service is provided for lawful purposes only. Users are responsible for complying with all applicable laws and regulations in their jurisdiction.
