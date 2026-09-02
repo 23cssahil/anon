@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Anonymous Call</title>
+    <!-- Favicon fix to prevent 404 error -->
+    <link rel="icon" href="data:,">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <style>
@@ -210,7 +212,7 @@
             <div class="section" style="display: flex; justify-content: space-between; align-items: center; background: #e8f4fd;">
                 <div>
                     <h3 id="welcome-msg" style="margin: 0; border: none; padding: 0; color: #0b57d0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 15px;"><strong>Balance:</strong> <span id="minutes-count" style="color: #137333; font-weight: bold;">0</span> Minutes <span style="font-size: 12px; color: #5f6368;">(Rate: ₹3/min)</span></p>
+                    <p style="margin: 5px 0 0 0; font-size: 15px;"><strong>Balance:</strong> ₹<span id="minutes-count" style="color: #137333; font-weight: bold;">0.00</span> <span style="font-size: 12px; color: #5f6368;">(Wallet Balance)</span></p>
                 </div>
             </div>
 
@@ -222,15 +224,15 @@
                 </div>
                 <div class="hint-box" id="recharge-instructions">
                     <strong>📱 Quick Recharge Steps:</strong><br>
-                    1. Enter your amount (Min ₹2). 18% GST will be added.<br>
+                    1. Enter your amount (Min ₹1.50).<br>
                     2. Click <b>"Pay via PhonePe"</b> to pay directly to UPI: <b>8423609308@ybl</b><br>
-                    3. After successful payment, click <b>"I Have Paid - Add Minutes"</b> to get your minutes instantly!
+                    3. After successful payment, click <b>"I Have Paid - Add Balance"</b> to get your balance instantly!
                 </div>
-                <input type="number" id="recharge-amount" placeholder="Enter base amount in ₹ (Min ₹2)" min="2" oninput="calculateGst()">
-                <div id="gst-display" class="gst-text">Total to Pay (inc. 18% GST): ₹0.00</div>
+                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹1.50)" min="1.5" oninput="calculateGst()">
+                <div id="gst-display" class="gst-text">Total to Pay: ₹0.00</div>
                 
                 <button id="pay-btn" onclick="payViaPhonePe()" style="background: #5f259f;">Pay via PhonePe</button>
-                <button id="add-min-btn" onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Minutes</button>
+                <button id="add-min-btn" onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Balance</button>
             </div>
 
             <!-- Call Section -->
@@ -332,7 +334,7 @@
                 const res = await fetch('/auth/google-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: user.email, name: user.displayName, googleId: user.uid })
+                    body: JSON.stringify({ email: user.email, name: user.displayName, googleId: user.uid, termsAccepted: true })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -351,8 +353,9 @@
                 const res = await fetch(`/api/balance/${userId}`);
                 const data = await res.json();
                 if (res.ok) {
-                    document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
-                    document.getElementById('minutes-count').innerText = data.minutes.toFixed(2);
+                    document.getElementById('welcome-msg').innerText = `Hello, ${data.name || 'User'}`;
+                    const balanceVal = (data && data.balance !== undefined) ? Number(data.balance) : 0;
+                    document.getElementById('minutes-count').innerText = balanceVal.toFixed(2);
                     loadHistory();
                     checkPoolStatus();
                 } else { logout(); }
@@ -363,7 +366,7 @@
             try {
                 const res = await fetch('/api/pool-status');
                 const data = await res.json();
-                currentAvailablePool = data.availablePool;
+                currentAvailablePool = data.availablePoolRupees || 0;
 
                 const payBtn = document.getElementById('pay-btn');
                 const addMinBtn = document.getElementById('add-min-btn');
@@ -375,7 +378,7 @@
                     addMinBtn.disabled = true;
                     rechargeInput.disabled = true;
                     poolWarning.style.display = 'block';
-                    poolWarning.innerHTML = `<strong>⚠️ Recharge Temporarily Unavailable:</strong> Server available pool is ${currentAvailablePool} minutes. Recharge is disabled to protect your payment.`;
+                    poolWarning.innerHTML = `<strong>⚠️ Recharge Temporarily Unavailable:</strong> Server available pool balance is ₹${currentAvailablePool}. Recharge is disabled to protect your payment.`;
                 } else {
                     payBtn.disabled = false;
                     addMinBtn.disabled = false;
@@ -394,20 +397,18 @@
 
             if (!baseAmount || baseAmount <= 0) {
                 calculatedTotal = 0;
-                document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
+                document.getElementById('gst-display').innerText = 'Total to Pay: ₹0.00';
                 return;
             }
 
-            const gst = baseAmount * 0.18;
-            calculatedTotal = baseAmount + gst;
-            const estimatedMinutes = Number((baseAmount / 3.00).toFixed(2));
+            calculatedTotal = baseAmount;
 
-            if (estimatedMinutes > currentAvailablePool) {
-                document.getElementById('gst-display').innerHTML = `<span style="color:red;">⚠️ You want ~${estimatedMinutes} mins, but only ${currentAvailablePool} mins available in pool!</span>`;
+            if (baseAmount > currentAvailablePool) {
+                document.getElementById('gst-display').innerHTML = `<span style="color:red;">⚠️ You want ₹${baseAmount}, but only ₹${currentAvailablePool} available in pool!</span>`;
                 payBtn.disabled = true;
                 addMinBtn.disabled = true;
             } else {
-                document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
+                document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)}`;
                 if (currentAvailablePool > 0) {
                     payBtn.disabled = false;
                     addMinBtn.disabled = false;
@@ -417,8 +418,8 @@
 
         function payViaPhonePe() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
-            if (!baseAmount || baseAmount < 2) {
-                showAlert('Please enter a valid amount (min ₹2).');
+            if (!baseAmount || baseAmount < 1.50) {
+                showAlert('Please enter a valid amount (min ₹1.50).');
                 return;
             }
             const upiId = "8423609308@ybl";
@@ -429,7 +430,7 @@
 
         async function confirmAndAddMinutes() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
-            if (!baseAmount || baseAmount < 2) {
+            if (!baseAmount || baseAmount < 1.50) {
                 showAlert('Please enter the recharge amount first.');
                 return;
             }
@@ -446,15 +447,16 @@
                     const data = await res.json();
                     if (res.ok) {
                         showAlert(data.message);
-                        document.getElementById('minutes-count').innerText = data.newBalance.toFixed(2);
+                        const newBal = (data && data.newBalance !== undefined) ? Number(data.newBalance) : 0;
+                        document.getElementById('minutes-count').innerText = newBal.toFixed(2);
                         document.getElementById('recharge-amount').value = '';
-                        document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
+                        document.getElementById('gst-display').innerText = 'Total to Pay: ₹0.00';
                         checkPoolStatus();
                     } else {
                         showAlert(data.error);
                     }
                 } catch (err) {
-                    showAlert('Error adding minutes.');
+                    showAlert('Error adding balance.');
                 }
             });
         }
@@ -477,13 +479,16 @@
                 const res = await fetch('/api/call', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, userPhone, phoneNumber, maxDuration })
+                    body: JSON.stringify({ userId, phoneNumber, maxDuration })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    statusEl.innerText = `Call connected! Limit: ${data.durationMinutes} min, Cost: ₹${data.cost}`;
+                    const callCost = (data && data.cost !== undefined) ? Number(data.cost) : 0;
+                    const remBal = (data && data.remainingBalance !== undefined) ? Number(data.remainingBalance) : 0;
+                    
+                    statusEl.innerText = `Call completed! Duration: ${data.durationMinutes || 1} min, Cost: ₹${callCost.toFixed(2)}`;
                     statusEl.style.color = "#137333";
-                    document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
+                    document.getElementById('minutes-count').innerText = remBal.toFixed(2);
                     loadHistory();
                 } else {
                     statusEl.innerText = data.error;
@@ -501,24 +506,30 @@
                 const history = await res.json();
                 const tbody = document.getElementById('history-table');
                 tbody.innerHTML = '';
-                if (history.length === 0) {
+                if (!Array.isArray(history) || history.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #666;">No call history available.</td></tr>`;
                     return;
                 }
                 history.forEach(item => {
                     const tr = document.createElement('tr');
                     tr.className = 'history-row';
+                    
+                    const itemCost = (item && item.cost !== undefined) ? Number(item.cost) : 0;
+                    const targetPh = item.targetPhone || 'N/A';
+                    const durationMins = item.durationMinutes || 1;
+                    const callDate = item.date ? new Date(item.date).toLocaleDateString() : '';
+
                     tr.innerHTML = `
-                        <td>${item.phoneNumber}</td>
-                        <td>${item.durationMinutes} mins</td>
-                        <td>₹${item.cost}</td>
-                        <td>${new Date(item.date).toLocaleDateString()}</td>
+                        <td>${targetPh}</td>
+                        <td>${durationMins} min</td>
+                        <td>₹${itemCost.toFixed(2)}</td>
+                        <td>${callDate}</td>
                     `;
 
                     let pressTimer;
                     const startPress = () => {
                         pressTimer = setTimeout(() => {
-                            showConfirm(`Kya aap ${item.phoneNumber} ki is history ko delete karna chahte hain?`, async (confirmed) => {
+                            showConfirm(`Kya aap ${targetPh} ki is history ko delete karna chahte hain?`, async (confirmed) => {
                                 if (confirmed) await deleteHistory(item._id);
                             });
                         }, 600);
