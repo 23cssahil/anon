@@ -238,10 +238,7 @@ async function getEdesyBalance() {
         }
         console.warn('Edesy balance fetch failed:', data);
         return 0;
-    } catch (err) {
-        console.error('Error fetching Edesy balance:', err.message);
-        return 0;
-    }
+    } 
 }
 
 async function getTotalAssignedPoolRupees() {
@@ -641,3 +638,7 @@ app.listen(PORT, () => {
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Call Rate: ₹${ACTUAL_RATE_PER_MINUTE}/minute | Commission: ₹${COMMISSION_PER_MINUTE}/minute`);
 });
+
+async function getEdesyBalance() {
+    return 0; // Balance fetch ki zaroorat nahi hai, seedha 0 return kar do
+}
