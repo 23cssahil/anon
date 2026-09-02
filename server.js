@@ -518,10 +518,6 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(500).json({ error: 'Server configuration error' });
         }
 
-        if (!process.env.EDESY_API_KEY) {
-            return res.status(500).json({ error: 'Server configuration error' });
-        }
-
         // --- YAHAN ADD KAREIN (Country code formatting) ---
         let formattedPartyA = decryptedPhone.startsWith('91') ? decryptedPhone : '91' + decryptedPhone;
         let formattedPartyB = phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber;
