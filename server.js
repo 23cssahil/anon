@@ -487,6 +487,14 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(500).json({ error: 'Server configuration error' });
         }
 
+        if (!process.env.EDESY_API_KEY) {
+            return res.status(500).json({ error: 'Server configuration error' });
+        }
+
+        // --- YAHAN ADD KAREIN (Country code formatting) ---
+        let formattedPartyA = decryptedPhone.startsWith('91') ? decryptedPhone : '91' + decryptedPhone;
+        let formattedPartyB = phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber;
+
         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
             method: 'POST',
             headers: {
@@ -494,12 +502,12 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                party_a: decryptedPhone,
-                party_b: phoneNumber,
+                party_a: formattedPartyA, // Updated variable yahan dena hai
+                party_b: formattedPartyB, // Updated variable yahan dena hai
                 max_duration: durationLimitMinutes
             })
         });
-
+        
         const edesyData = await edesyResponse.json();
         if (!edesyResponse.ok) {
             return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
