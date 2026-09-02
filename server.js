@@ -33,7 +33,7 @@ const callSchema = new mongoose.Schema({
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
 
-// Auth Route (Mock / Google Login Handler)
+// Auth Route (Google Login Handler)
 app.post('/auth/google-login', async (req, res) => {
     try {
         const { email, name, googleId } = req.body;
@@ -60,20 +60,20 @@ app.get('/api/balance/:userId', async (req, res) => {
     }
 });
 
-// Recharge Route (Minimum ₹50 limit & Token calculation: 1 Token = ₹10)
+// Recharge Route (Minimum ₹5 limit & Token calculation: 1 Token = ₹5)
 app.post('/api/recharge', async (req, res) => {
     const { userId, amount } = req.body;
 
     try {
-        if (!amount || amount < 50) {
-            return res.status(400).json({ error: 'Minimum recharge amount is ₹50.' });
+        if (!amount || amount < 5) {
+            return res.status(400).json({ error: 'Minimum recharge amount is ₹5.' });
         }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Calculate tokens based on amount (e.g., ₹50 = 5 tokens)
-        const tokensToAdd = Math.floor(amount / 10);
+        // Calculate tokens based on amount (₹5 = 1 Token)
+        const tokensToAdd = Math.floor(amount / 5);
         user.tokens += tokensToAdd;
         await user.save();
 
@@ -93,7 +93,7 @@ app.post('/api/call', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (user.tokens < 2) {
-            return res.status(400).json({ error: 'Insufficient tokens. Please recharge (Minimum ₹50).' });
+            return res.status(400).json({ error: 'Insufficient tokens. Please recharge (Minimum ₹5).' });
         }
 
         // Real Edesy API Call Request

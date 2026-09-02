@@ -43,11 +43,11 @@
                 <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
-            <!-- Recharge Section with Min ₹50 Limit -->
+            <!-- Recharge Section with Min ₹5 Limit -->
             <div class="section">
                 <h3>Recharge Tokens / Balance</h3>
-                <p style="color: #666; font-size: 14px; margin: 5px 0;">Minimum recharge amount is <strong>₹50</strong> (1 Token = ₹10)</p>
-                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹50)" min="50">
+                <p style="color: #666; font-size: 14px; margin: 5px 0;">Minimum recharge amount is <strong>₹5</strong> (1 Token = ₹5)</p>
+                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹5)" min="5">
                 <button onclick="rechargeWallet()" style="background: #ffc107; color: #000;">Recharge Now</button>
             </div>
 
@@ -79,7 +79,7 @@
     </div>
 
     <script>
-        // Firebase Configuration from your setup
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
             authDomain: "anonymous-calling-app-e14de.firebaseapp.com",
@@ -106,7 +106,6 @@
                 const result = await firebase.auth().signInWithPopup(provider);
                 const user = result.user;
 
-                // Send Firebase user details to backend to save/fetch from MongoDB
                 const res = await fetch('/auth/google-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -150,13 +149,13 @@
             }
         }
 
-        // Recharge Wallet Logic with Min ₹50 Validation
+        // Recharge Wallet Logic with Min ₹5 Validation
         async function rechargeWallet() {
             const amountInput = document.getElementById('recharge-amount');
             const amount = Number(amountInput.value);
 
-            if (!amount || amount < 50) {
-                alert('Minimum recharge amount is ₹50.');
+            if (!amount || amount < 5) {
+                alert('Minimum recharge amount is ₹5.');
                 return;
             }
 
@@ -232,7 +231,6 @@
                     return;
                 }
 
-// Inside history loop
                 history.forEach(item => {
                     tbody.innerHTML += `<tr>
                         <td>${item.phoneNumber}</td>
