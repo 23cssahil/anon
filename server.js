@@ -2,6 +2,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+
+const callLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    validate: { trustProxy: false }, // Yeh line express-rate-limit ke crash ko rok degi
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 require('dotenv').config();
@@ -9,7 +17,7 @@ require('dotenv').config();
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.static('public'));
 
@@ -38,13 +46,6 @@ const otpLimiter = rateLimit({
     legacyHeaders: false
 });
 
-const callLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
-    max: 30,
-    message: 'Bahut calls lag rahe hain. Kripya baad mein try karein.',
-    standardHeaders: true,
-    legacyHeaders: false
-});
 
 const rechargeLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
