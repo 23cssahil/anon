@@ -431,14 +431,19 @@ app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, re
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Manual UPI QR recharge ke liye direct balance update karein
+        // Minutes calculation: ₹3 per minute
+        const minutesToAdd = amount / 3;
+
+        // Balance aur Minutes dono update karein
         user.balance = Number((user.balance + amount).toFixed(2));
+        user.minutes = Number(((user.minutes || 0) + minutesToAdd).toFixed(2));
         await user.save();
 
         return res.json({
             success: true,
-            message: `₹${amount} added successfully!`,
-            newBalance: user.balance
+            message: `₹${amount} added successfully! (${minutesToAdd.toFixed(1)} Minutes added)`,
+            newBalance: user.balance,
+            newMinutes: user.minutes
         });
 
     } catch (error) {

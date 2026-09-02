@@ -514,24 +514,22 @@
     <span style="font-size: 14px; color: #5f259f; font-weight: bold;">UPI ID: 8423609308@ybl</span>
 
     <div class="form-group" style="margin-top: 15px;">
-        <label>Amount (₹)</label>
-        <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst(): updateUpiLink():">
-    </div>
-
-    <div class="gst-display" id="gst-display" style="margin-bottom: 15px; font-weight: bold;">Total: ₹0.00</div>
-
-    <!-- WhatsApp Style Scan & Pay Button -->
-    <!-- WhatsApp Style Scan & Pay Link Button -->
-    <a href="javascript:void(0);" id="scan-pay-btn" class="btn" onclick="openPhonePeApp(event)" style="display: block; text-align: center; text-decoration: none; background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-sizing: border-box;">
-        <i class="fas fa-qrcode"></i> Scan & Pay via PhonePe
-    </a>
-    
-    <!-- Confirm Balance Button -->
-    <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px; width: 100%; background: #28a745; color: white; padding: 10px; border-radius: 6px; border: none; font-weight: bold;">
-        <i class="fas fa-check"></i> Payment Hone ke Baad Yahan Click Karein (Confirm & Add)
-    </button>
+    <label>Amount (₹)</label>
+    <!-- Yahan colons ki jagah semicolons (;) kar diya hai -->
+    <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst(); updateUpiLink();">
 </div>
 
+<div class="gst-display" id="gst-display" style="margin-bottom: 15px; font-weight: bold;">Total: ₹0.00</div>
+
+<!-- Scan & Pay Button -->
+<a href="javascript:void(0);" id="scan-pay-btn" class="btn" onclick="openPhonePeApp(event)" style="display: block; text-align: center; text-decoration: none; background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-sizing: border-box;">
+    <i class="fas fa-qrcode"></i> Scan & Pay via PhonePe
+</a>
+
+<!-- Confirm Balance Button -->
+<button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px; width: 100%; background: #28a745; color: white; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
+    <i class="fas fa-check"></i> Payment Hone ke Baad Yahan Click Karein (Confirm & Add)
+</button>
 <script>
 // 1. Jaise hi user amount type karega, link set ho jayega
 function updateUpiLink() {
@@ -802,22 +800,32 @@ function openPhonePeApp(event) {
 
         // Calculate Amount
         function calculateGst() {
-            const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
-            calculatedTotal = baseAmount;
+    const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
 
-            if (baseAmount <= 0) {
-                document.getElementById('gst-display').innerText = 'Total: ₹0.00';
-                return;
-            }
+    if (baseAmount <= 0) {
+        document.getElementById('gst-display').innerText = 'Total: ₹0.00';
+        const addBtn = document.getElementById('add-min-btn');
+        if (addBtn) addBtn.disabled = true;
+        return;
+    }
 
-            if (baseAmount > currentAvailablePool) {
-                document.getElementById('gst-display').innerHTML = `<span style="color: red;">⚠️ Only ₹${currentAvailablePool.toFixed(2)} available!</span>`;
-                document.getElementById('add-min-btn').disabled = true;
-            } else {
-                document.getElementById('gst-display').innerText = `Total: ₹${calculatedTotal.toFixed(2)}`;
-                document.getElementById('add-min-btn').disabled = false;
-            }
-        }
+    // 18% GST Calculation
+    const gstAmount = baseAmount * 0.18;
+    const totalAmount = baseAmount + gstAmount; // Yeh amount user PhonePe par pay karega
+    const minutes = baseAmount / 3;             // ₹3 per minute ke hisaab se minutes
+
+    // UI par Base, GST, Total aur Minutes dikhayein
+    const gstDisplay = document.getElementById('gst-display');
+    if (gstDisplay) {
+        gstDisplay.innerHTML = `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br><b style="color: #28a745;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br><small style="color: #5f259f;">Talktime: ${minutes.toFixed(1)} Minutes</small>`;
+    }
+
+    // Button enable kar dein agar amount valid hai
+    const addBtn = document.getElementById('add-min-btn');
+    if (addBtn) {
+        addBtn.disabled = false;
+    }
+}
 
         // Add Balance
         async function confirmAndAddMinutes() {
