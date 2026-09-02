@@ -7,38 +7,154 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .section { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
-        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0056b3; }
-        .hint-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 13px; color: #333; margin-bottom: 10px; }
-        label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; user-select: none; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f0f2f5; 
+            margin: 0; 
+            padding: 0; 
+            color: #333;
+        }
+        .container { 
+            width: 100%; 
+            min-height: 100vh; 
+            background: #ffffff; 
+            padding: 20px; 
+            display: flex;
+            flex-direction: column;
+        }
+        header.app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        header.app-header h2 {
+            margin: 0;
+            color: #1a73e8;
+        }
+        .section { 
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #444;
+            font-size: 18px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
+        input, select, button { 
+            padding: 12px; 
+            margin: 8px 0; 
+            width: 100%; 
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        input:focus, select:focus {
+            border-color: #1a73e8;
+            outline: none;
+        }
+        button { 
+            background: #1a73e8; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: background 0.2s;
+        }
+        button:hover { background: #1557b0; }
+        .hint-box { 
+            background: #e8f0fe; 
+            border-left: 4px solid #1a73e8;
+            padding: 12px; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            color: #174ea6; 
+            margin-bottom: 15px; 
+            line-height: 1.5;
+        }
+        label { 
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #555; 
+            display: block; 
+            margin-top: 10px; 
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px; 
+            background: #fff;
+        }
+        th, td { 
+            border: 1px solid #e0e0e0; 
+            padding: 12px; 
+            text-align: left; 
+            font-size: 14px; 
+            user-select: none; 
+        }
+        th {
+            background: #f1f3f4;
+            color: #3c443b;
+        }
         tr.history-row { cursor: pointer; transition: background 0.2s; }
-        tr.history-row:hover { background: #f1f3f5; }
-        .gst-text { font-size: 13px; color: #d9534f; margin: 5px 0; font-weight: bold; }
+        tr.history-row:hover { background: #f8f9fa; }
+        .gst-text { 
+            font-size: 14px; 
+            color: #d93025; 
+            margin: 8px 0; 
+            font-weight: bold; 
+        }
+        
+        /* Desktop optimization: max width with centered layout if screen is very wide */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 750px;
+                margin: 0 auto;
+                min-height: auto;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+        }
     </style>
 </head>
 <body>
 
     <div class="container" id="app">
-        <h2>User Dashboard</h2>
+        <header class="app-header">
+            <h2>Anonymous Call</h2>
+            <div id="header-right" style="display:none;">
+                <button onclick="logout()" style="width: auto; background: #dc3545; padding: 8px 16px; font-size: 13px; margin: 0;">Logout</button>
+            </div>
+        </header>
         
-        <div id="login-section" class="section">
-            <h3>Login to Continue</h3>
-            <button onclick="loginWithGoogle()" style="background: #db4437;">Sign in with Google</button>
+        <div id="login-section" class="section" style="text-align: center; padding: 40px 20px;">
+            <h3>Welcome! Please Login to Continue</h3>
+            <p style="color: #666; margin-bottom: 20px;">Secure, masked calling with instant UPI recharge.</p>
+            <button onclick="loginWithGoogle()" style="background: #db4437; max-width: 300px;">Sign in with Google</button>
         </div>
 
         <div id="dashboard-section" style="display:none;">
-            <div class="section" style="display: flex; justify-content: space-between; align-items: center;">
+            <!-- User Status Bar -->
+            <div class="section" style="display: flex; justify-content: space-between; align-items: center; background: #e8f4fd;">
                 <div>
-                    <h3 id="welcome-msg" style="margin: 0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes <span style="font-size: 11px; color: #28a745;">(Rate: ₹3/min)</span></p>
+                    <h3 id="welcome-msg" style="margin: 0; border: none; padding: 0; color: #0b57d0;">Hello, User</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 15px;"><strong>Balance:</strong> <span id="minutes-count" style="color: #137333; font-weight: bold;">0</span> Minutes <span style="font-size: 12px; color: #5f6368;">(Rate: ₹3/min)</span></p>
                 </div>
-                <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
             <!-- Direct PhonePe Recharge Section -->
@@ -53,8 +169,8 @@
                 <input type="number" id="recharge-amount" placeholder="Enter base amount in ₹ (Min ₹2)" min="2" oninput="calculateGst()">
                 <div id="gst-display" class="gst-text">Total to Pay (inc. 18% GST): ₹0.00</div>
                 
-                <button onclick="payViaPhonePe()" style="background: #5f259f; color: #fff;">Pay via PhonePe</button>
-                <button onclick="confirmAndAddMinutes()" style="background: #28a745; color: #fff; margin-top: 5px;">I Have Paid - Add Minutes</button>
+                <button onclick="payViaPhonePe()" style="background: #5f259f;">Pay via PhonePe</button>
+                <button onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Minutes</button>
             </div>
 
             <!-- Call Section -->
@@ -75,24 +191,26 @@
                     <option value="unlimited">Unlimited (Talk until balance ends)</option>
                 </select>
                 
-                <button onclick="makeCall()" style="background: #28a745; margin-top: 10px;">Call Now</button>
-                <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px;"></p>
+                <button onclick="makeCall()" style="background: #137333; margin-top: 15px;">Call Now</button>
+                <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px; text-align: center;"></p>
             </div>
 
             <!-- History Section with Tap & Hold Delete -->
             <div class="section">
-                <h3>Call History <span style="font-size: 11px; color: #666; font-weight: normal;">(Tap & Hold any row to delete)</span></h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Target Number</th>
-                            <th>Duration</th>
-                            <th>Cost</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-table"></tbody>
-                </table>
+                <h3>Call History <span style="font-size: 12px; color: #666; font-weight: normal;">(Tap & Hold any row to delete)</span></h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Target Number</th>
+                                <th>Duration</th>
+                                <th>Cost</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -135,6 +253,7 @@
         async function loadDashboard() {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
+            document.getElementById('header-right').style.display = 'block';
             try {
                 const res = await fetch(`/api/balance/${userId}`);
                 const data = await res.json();
@@ -165,12 +284,9 @@
                 alert('Please enter a valid amount (min ₹2).');
                 return;
             }
-            // UPI Intent Link for PhonePe / UPI Apps
             const upiId = "8423609308@ybl";
             const payeeName = "Anonymous Call";
             const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${calculatedTotal.toFixed(2)}&cu=INR`;
-            
-            // Open UPI App
             window.location.href = upiUrl;
         }
 
@@ -217,7 +333,7 @@
             }
 
             statusEl.innerText = "Calling your phone first...";
-            statusEl.style.color = "#007bff";
+            statusEl.style.color = "#1a73e8";
 
             try {
                 const res = await fetch('/api/call', {
@@ -228,16 +344,16 @@
                 const data = await res.json();
                 if (res.ok) {
                     statusEl.innerText = `Call connected! Limit: ${data.durationMinutes} min, Cost: ₹${data.cost}`;
-                    statusEl.style.color = "#28a745";
+                    statusEl.style.color = "#137333";
                     document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
                     loadHistory();
                 } else {
                     statusEl.innerText = data.error;
-                    statusEl.style.color = "#dc3545";
+                    statusEl.style.color = "#d93025";
                 }
             } catch (err) {
                 statusEl.innerText = "Network error connecting call.";
-                statusEl.style.color = "#dc3545";
+                statusEl.style.color = "#d93025";
             }
         }
 
@@ -248,7 +364,7 @@
                 const tbody = document.getElementById('history-table');
                 tbody.innerHTML = '';
                 if (history.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No history.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #666;">No call history available.</td></tr>`;
                     return;
                 }
                 history.forEach(item => {
