@@ -433,11 +433,11 @@ app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, re
         const assignedRupees = await getTotalAssignedPoolRupees();
         const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
 
-        if (amount > availablePoolRupees) {
-            return res.status(400).json({
-                error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}`
-            });
-        }
+        // if (amount > availablePoolRupees) {
+        //     return res.status(400).json({
+        //         error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}`
+        //     });
+        // }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
