@@ -417,38 +417,123 @@ app.post('/api/verify-otp', authenticateToken, async (req, res) => {
     }
 });
 
-/// ============== RECHARGE ==============
-app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, res) => {
+// ============== CALL API ==============
+app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
     try {
-        const { baseAmount } = req.body;
+        const { phoneNumber, maxDuration, actualDurationSeconds } = req.body;
         const userId = req.user.userId;
 
-        const amount = Number(baseAmount);
-        if (!amount || amount < ACTUAL_RATE_PER_MINUTE || amount > 10000) {
-            return res.status(400).json({ error: `Recharge amount ₹${ACTUAL_RATE_PER_MINUTE} to ₹10,000 ke beech hona chahiye.` });
+        if (!phoneNumber || !validatePhone(phoneNumber)) {
+            return res.status(400).json({ error: 'Valid phone number required (10 digits)' });
         }
 
-        const user = await User.findById(userId);
+        let actualSecs = 0;
+        if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) {
+            actualSecs = Number(actualDurationSeconds);
+            if (isNaN(actualSecs) || actualSecs < 0 || actualSecs > 3600) {
+                return res.status(400).json({ error: 'Duration must be between 0 and 3600 seconds' });
+            }
+        }
+
+        const user = await User.findById(userId).select('+verifiedPhone');
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Minutes calculation: ₹3 per minute
-        const minutesToAdd = amount / 3;
+        if (!user.termsAccepted) {
+            return res.status(400).json({ error: 'Pehle Terms of Service accept karni hongi.' });
+        }
 
-        // Balance aur Minutes dono update karein
-        user.balance = Number((user.balance + amount).toFixed(2));
-        user.minutes = Number(((user.minutes || 0) + minutesToAdd).toFixed(2));
-        await user.save();
+        // --- Safe Decryption with Fallback (Server crash nahi hoga ab) ---
+        let decryptedPhone;
+        try {
+            decryptedPhone = decryptSensitiveData(user.verifiedPhone);
+            if (!decryptedPhone) {
+                decryptedPhone = user.verifiedPhone; // Agar null aaye toh raw use ho jaye
+            }
+        } catch (e) {
+            decryptedPhone = user.verifiedPhone; // Agar error aaye toh bhi raw use ho jaye
+        }
 
-        return res.json({
-            success: true,
-            message: `₹${amount} added successfully! (${minutesToAdd.toFixed(1)} Minutes added)`,
-            newBalance: user.balance,
-            newMinutes: user.minutes
+        if (!decryptedPhone) {
+            return res.status(500).json({ error: 'Phone number decryption error' });
+        }
+
+        // Minimum ₹3 required
+        if (user.balance < ACTUAL_RATE_PER_MINUTE) {
+            return res.status(400).json({
+                error: `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
+            });
+        }
+
+        let maxAllowedMinutes = Math.floor(user.balance / ACTUAL_RATE_PER_MINUTE);
+        if (maxAllowedMinutes < 1) maxAllowedMinutes = 1;
+
+        let durationLimitMinutes = maxAllowedMinutes;
+        if (maxDuration && maxDuration !== 'unlimited') {
+            const requestedMins = Number(maxDuration);
+            if (!isNaN(requestedMins) && requestedMins > 0 && requestedMins < durationLimitMinutes) {
+                durationLimitMinutes = requestedMins;
+            }
+        }
+
+        if (!process.env.EDESY_API_KEY) {
+            return res.status(500).json({ error: 'Server configuration error' });
+        }
+
+        const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                party_a: decryptedPhone,
+                party_b: phoneNumber,
+                max_duration: durationLimitMinutes
+            })
         });
 
+        const edesyData = await edesyResponse.json();
+        if (!edesyResponse.ok) {
+            return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
+        }
+
+        // ========== BILLING LOGIC: ₹3 PER MINUTE ==========
+        let billedMinutes = 1; 
+        
+        if (actualSecs > 0) {
+            billedMinutes = Math.ceil(actualSecs / 60); 
+        }
+
+        const callCost = Number((billedMinutes * ACTUAL_RATE_PER_MINUTE).toFixed(2));
+
+        // Deduct from wallet
+        user.balance = Math.max(0, Number((user.balance - callCost).toFixed(2)));
+        await user.save();
+
+        const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+
+        await CallHistory.create({
+            userId,
+            callerPhone: decryptedPhone,
+            targetPhone: phoneNumber,
+            durationMinutes: billedMinutes,
+            durationSeconds: actualSecs,
+            cost: callCost,
+            clientIp,
+            userAgent
+        });
+
+        res.json({
+            success: true,
+            message: 'Call completed!',
+            remainingBalance: user.balance,
+            durationMinutes: billedMinutes,
+            cost: callCost
+        });
     } catch (error) {
-        console.error('Recharge error:', error.message);
-        res.status(500).json({ error: 'Error processing recharge' });
+        console.error('Call error:', error.message);
+        res.status(500).json({ error: 'Server error during call' });
     }
 });
 // ============== CALL API ==============
