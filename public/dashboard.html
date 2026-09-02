@@ -515,14 +515,14 @@
 
     <div class="form-group" style="margin-top: 15px;">
         <label>Amount (₹)</label>
-        <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst()">
+        <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst(): updateUpiLink():">
     </div>
 
     <div class="gst-display" id="gst-display" style="margin-bottom: 15px; font-weight: bold;">Total: ₹0.00</div>
 
     <!-- WhatsApp Style Scan & Pay Button -->
     <!-- WhatsApp Style Scan & Pay Link Button -->
-    <a href="#" id="scan-pay-btn" class="btn" style="display: block; text-align: center; text-decoration: none; background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-sizing: border-box;">
+    <a href="javascript:void(0);" id="scan-pay-btn" class="btn" onclick="openPhonePeApp(event)" style="display: block; text-align: center; text-decoration: none; background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-sizing: border-box;">
         <i class="fas fa-qrcode"></i> Scan & Pay via PhonePe
     </a>
     
@@ -533,24 +533,30 @@
 </div>
 
 <script>
-function openPhonePeApp() {
+// 1. Jaise hi user amount type karega, link set ho jayega
+function updateUpiLink() {
+    const amountInput = document.getElementById('recharge-amount').value;
+    const amount = Number(amountInput);
+    const scanPayBtn = document.getElementById('scan-pay-btn');
+
+    if (amount >= 3) {
+        const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+        scanPayBtn.href = upiPayUrl;
+    } else {
+        scanPayBtn.href = "javascript:void(0);";
+    }
+}
+
+// 2. Jab user click karega, agar amount kam hua toh rok lega
+function openPhonePeApp(event) {
     const amountInput = document.getElementById('recharge-amount').value;
     const amount = Number(amountInput);
 
     if (!amount || amount < 3) {
+        if (event) event.preventDefault();
         alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
         return;
     }
-
-    const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-    
-    // Try to open UPI app, with a fallback
-    window.location.href = upiPayUrl;
-    
-    // Fallback message agar app trigger na ho
-    setTimeout(() => {
-        alert('Agar UPI app nahi khuli, toh aap niche diye gaye QR Code ko screenshot lekar ya gallery se scan karke payment kar sakte hain!');
-    }, 1500);
 }
 </script>
             <!-- Make Call Card -->
