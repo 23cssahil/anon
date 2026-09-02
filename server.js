@@ -232,15 +232,6 @@ async function getEdesyBalance() {
         //     timeout: 5000
         // });
 
-        const data = await response.json();
-        if (response.ok) {
-            return Number(data.minutes || data.balance || 0);
-        }
-        console.warn('Edesy balance fetch failed:', data);
-        return 0;
-    } 
-}
-
 async function getTotalAssignedPoolRupees() {
     try {
         const result = await User.aggregate([
