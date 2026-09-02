@@ -498,12 +498,56 @@
             </div>
 
             <!-- Recharge Card -->
-           <div class="card">
+           <div class="card" style="text-align: center;">
     <h2><i class="fas fa-credit-card"></i> Recharge Wallet</h2>
     
-    <div id="pool-warning" class="warning-box" style="display: none;">
-        <strong>⚠️ Notice:</strong> Pool is currently low, but you can still recharge.
+    <div class="hint-box" style="margin-bottom: 15px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+        <strong>📱 Instant Pay (WhatsApp Style):</strong><br>
+        1. Amount enter karein.<br>
+        2. Niche diye gaye <strong>"Scan & Pay"</strong> button par click karein.<br>
+        3. Seedha PhonePe / GPay khul jayega, wahan PIN daal kar pay karein!
     </div>
+
+    <!-- QR Code Image (Laptop/PC users ke liye scan karne ko) -->
+    <img src="/images/phonepe-qr.jpg" alt="PhonePe QR Code" style="width: 170px; height: 170px; margin: 10px auto; display: block; border: 1px solid #ccc; border-radius: 8px;">
+    
+    <span style="font-size: 14px; color: #5f259f; font-weight: bold;">UPI ID: 8423609308@ybl</span>
+
+    <div class="form-group" style="margin-top: 15px;">
+        <label>Amount (₹)</label>
+        <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst()">
+    </div>
+
+    <div class="gst-display" id="gst-display" style="margin-bottom: 15px; font-weight: bold;">Total: ₹0.00</div>
+
+    <!-- WhatsApp Style Scan & Pay Button for Mobile -->
+    <button id="scan-pay-btn" class="btn" onclick="openPhonePeApp()" style="background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer;">
+        <i class="fas fa-qrcode"></i> Scan & Pay via PhonePe
+    </button>
+    
+    <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px; width: 100%; background: #28a745; color: white; padding: 10px; border-radius: 6px; border: none; font-weight: bold;">
+        <i class="fas fa-check"></i> Payment Hone ke Baad Yahan Click Karein
+    </button>
+</div>
+
+<script>
+// Jaise hi user "Scan & Pay" dabayega, yeh function exact amount ke sath app khol dega
+function openPhonePeApp() {
+    const amountInput = document.getElementById('recharge-amount').value;
+    const amount = Number(amountInput);
+
+    if (!amount || amount < 3) {
+        alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
+        return;
+    }
+
+    // Professional UPI Intent URL jo mobile par direct app trigger karta hai
+    const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+    
+    // Triggering the app
+    window.location.href = upiPayUrl;
+}
+</script>
 
     <!-- QR Code & Instructions Box -->
     <div class="hint-box" style="text-align: center;">
