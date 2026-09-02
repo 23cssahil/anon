@@ -30,7 +30,6 @@ const callSchema = new mongoose.Schema({
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
 
-// 1. Fetch Total Edesy Balance from API
 async function getEdesyBalance() {
     try {
         const response = await fetch('https://voice-api.edesy.in/v1/balance', {
@@ -51,7 +50,6 @@ async function getEdesyBalance() {
     }
 }
 
-// 2. Calculate Total Minutes currently assigned to all Users in Database
 async function getTotalAssignedUserMinutes() {
     try {
         const result = await User.aggregate([
@@ -64,7 +62,18 @@ async function getTotalAssignedUserMinutes() {
     }
 }
 
-// Google Login & Signup Route with Free Minute Pool Check
+// New API to check real-time pool status for frontend
+app.get('/api/pool-status', async (req, res) => {
+    try {
+        const edesyTotal = await getEdesyBalance();
+        const assignedTotal = await getTotalAssignedUserMinutes();
+        const availablePool = Number((edesyTotal - assignedTotal).toFixed(2));
+        res.json({ edesyTotal, assignedTotal, availablePool });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pool status' });
+    }
+});
+
 app.post('/auth/google-login', async (req, res) => {
     try {
         const { email, name, googleId } = req.body;
@@ -76,7 +85,6 @@ app.post('/auth/google-login', async (req, res) => {
             const availablePool = edesyTotal - assignedTotal;
 
             let freeMinutes = 0;
-            // Agar Edesy total mein se users ke minutes hatane ke baad bhi pool mein >= 1 minute bacha hai, tabhi free do
             if (availablePool >= 1) {
                 freeMinutes = 1;
             }
@@ -100,7 +108,6 @@ app.get('/api/balance/:userId', async (req, res) => {
     }
 });
 
-// Recharge Route with Dynamic Pool Comparison (Edesy Total vs Total Assigned Users)
 app.post('/api/add-recharge', async (req, res) => {
     const { userId, baseAmount } = req.body;
     try {
@@ -111,15 +118,13 @@ app.post('/api/add-recharge', async (req, res) => {
         const ratePerMinute = 3.00;
         const minutesToAdd = Number((baseAmount / ratePerMinute).toFixed(2));
 
-        // Get Edesy Total and Total Assigned to current users
         const edesyTotal = await getEdesyBalance();
         const assignedTotal = await getTotalAssignedUserMinutes();
         const availablePool = Number((edesyTotal - assignedTotal).toFixed(2));
 
-        // Check if user is asking for more than the remaining real pool
         if (minutesToAdd > availablePool) {
             return res.status(400).json({ 
-                error: `Is time aap ${minutesToAdd} minutes add nahi kar sakte. Edesy Total: ${edesyTotal}, Already Assigned to Users: ${assignedTotal}, Abhi available pool mein sirf: ${availablePool} minutes bache hain.` 
+                error: `Recharge blocked! Available pool: ${availablePool} minutes (Aapko chahiye: ${minutesToAdd}).` 
             });
         }
 
@@ -131,7 +136,7 @@ app.post('/api/add-recharge', async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: `Payment confirmed! ${minutesToAdd} minutes successfully added to your account.`,
+            message: `Payment confirmed! ${minutesToAdd} minutes added successfully.`,
             newBalance: user.minutes
         });
     } catch (error) {
@@ -139,7 +144,6 @@ app.post('/api/add-recharge', async (req, res) => {
     }
 });
 
-// Call Route
 app.post('/api/call', async (req, res) => {
     const { userId, userPhone, phoneNumber, maxDuration } = req.body;
     

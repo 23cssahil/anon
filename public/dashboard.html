@@ -71,6 +71,7 @@
             transition: background 0.2s;
         }
         button:hover { background: #1557b0; }
+        button:disabled { background: #cccccc !important; cursor: not-allowed; }
         .hint-box { 
             background: #e8f0fe; 
             border-left: 4px solid #1a73e8;
@@ -127,6 +128,42 @@
             margin: 8px 0; 
             font-weight: bold; 
         }
+
+        /* Custom Modal Popup Styles */
+        #custom-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            max-width: 380px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .modal-msg {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .modal-buttons button {
+            width: auto;
+            padding: 8px 20px;
+            margin: 0;
+        }
         
         @media (min-width: 768px) {
             .container {
@@ -142,6 +179,17 @@
     </style>
 </head>
 <body>
+
+    <!-- Custom Modal Popup -->
+    <div id="custom-modal">
+        <div class="modal-content">
+            <div id="modal-msg" class="modal-msg">Message here</div>
+            <div class="modal-buttons">
+                <button id="modal-ok-btn" onclick="closeModal(true)">OK</button>
+                <button id="modal-cancel-btn" onclick="closeModal(false)" style="background: #dc3545; display:none;">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <div class="container" id="app">
         <header class="app-header">
@@ -169,7 +217,10 @@
             <!-- Direct PhonePe Recharge Section -->
             <div class="section">
                 <h3>Recharge via PhonePe</h3>
-                <div class="hint-box">
+                <div id="pool-warning" class="hint-box" style="background: #fce8e6; border-left-color: #d93025; color: #c5221f; display:none;">
+                    <strong>⚠️ Recharge Temporarily Unavailable:</strong> Server pool balance is currently exhausted or insufficient. Recharge has been disabled to protect your payments.
+                </div>
+                <div class="hint-box" id="recharge-instructions">
                     <strong>📱 Quick Recharge Steps:</strong><br>
                     1. Enter your amount (Min ₹2). 18% GST will be added.<br>
                     2. Click <b>"Pay via PhonePe"</b> to pay directly to UPI: <b>8423609308@ybl</b><br>
@@ -178,8 +229,8 @@
                 <input type="number" id="recharge-amount" placeholder="Enter base amount in ₹ (Min ₹2)" min="2" oninput="calculateGst()">
                 <div id="gst-display" class="gst-text">Total to Pay (inc. 18% GST): ₹0.00</div>
                 
-                <button onclick="payViaPhonePe()" style="background: #5f259f;">Pay via PhonePe</button>
-                <button onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Minutes</button>
+                <button id="pay-btn" onclick="payViaPhonePe()" style="background: #5f259f;">Pay via PhonePe</button>
+                <button id="add-min-btn" onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Minutes</button>
             </div>
 
             <!-- Call Section -->
@@ -248,6 +299,30 @@
         let userId = localStorage.getItem('userId');
         if (userId) loadDashboard();
         let calculatedTotal = 0;
+        let currentAvailablePool = 0;
+        let modalCallback = null;
+
+        // Custom Modal Functions
+        function showAlert(message) {
+            document.getElementById('modal-msg').innerText = message;
+            document.getElementById('modal-cancel-btn').style.display = 'none';
+            document.getElementById('custom-modal').style.display = 'flex';
+        }
+
+        function showConfirm(message, callback) {
+            document.getElementById('modal-msg').innerText = message;
+            document.getElementById('modal-cancel-btn').style.display = 'inline-block';
+            document.getElementById('custom-modal').style.display = 'flex';
+            modalCallback = callback;
+        }
+
+        function closeModal(result) {
+            document.getElementById('custom-modal').style.display = 'none';
+            if (modalCallback) {
+                modalCallback(result);
+                modalCallback = null;
+            }
+        }
 
         async function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -265,7 +340,7 @@
                     userId = data.user._id;
                     loadDashboard();
                 }
-            } catch (error) { alert('Login failed: ' + error.message); }
+            } catch (error) { showAlert('Login failed: ' + error.message); }
         }
 
         async function loadDashboard() {
@@ -279,27 +354,71 @@
                     document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
                     document.getElementById('minutes-count').innerText = data.minutes.toFixed(2);
                     loadHistory();
+                    checkPoolStatus();
                 } else { logout(); }
             } catch (err) { console.error(err); }
         }
 
+        async function checkPoolStatus() {
+            try {
+                const res = await fetch('/api/pool-status');
+                const data = await res.json();
+                currentAvailablePool = data.availablePool;
+
+                const payBtn = document.getElementById('pay-btn');
+                const addMinBtn = document.getElementById('add-min-btn');
+                const poolWarning = document.getElementById('pool-warning');
+                const rechargeInput = document.getElementById('recharge-amount');
+
+                if (currentAvailablePool <= 0) {
+                    payBtn.disabled = true;
+                    addMinBtn.disabled = true;
+                    rechargeInput.disabled = true;
+                    poolWarning.style.display = 'block';
+                    poolWarning.innerHTML = `<strong>⚠️ Recharge Temporarily Unavailable:</strong> Server available pool is ${currentAvailablePool} minutes. Recharge is disabled to protect your payment.`;
+                } else {
+                    payBtn.disabled = false;
+                    addMinBtn.disabled = false;
+                    rechargeInput.disabled = false;
+                    poolWarning.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Failed to check pool status', err);
+            }
+        }
+
         function calculateGst() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
+            const payBtn = document.getElementById('pay-btn');
+            const addMinBtn = document.getElementById('add-min-btn');
+
             if (!baseAmount || baseAmount <= 0) {
                 calculatedTotal = 0;
                 document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
                 return;
             }
+
             const gst = baseAmount * 0.18;
             calculatedTotal = baseAmount + gst;
-            const estimatedMinutes = (baseAmount / 3.00).toFixed(2);
-            document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
+            const estimatedMinutes = Number((baseAmount / 3.00).toFixed(2));
+
+            if (estimatedMinutes > currentAvailablePool) {
+                document.getElementById('gst-display').innerHTML = `<span style="color:red;">⚠️ You want ~${estimatedMinutes} mins, but only ${currentAvailablePool} mins available in pool!</span>`;
+                payBtn.disabled = true;
+                addMinBtn.disabled = true;
+            } else {
+                document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
+                if (currentAvailablePool > 0) {
+                    payBtn.disabled = false;
+                    addMinBtn.disabled = false;
+                }
+            }
         }
 
         function payViaPhonePe() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
             if (!baseAmount || baseAmount < 2) {
-                alert('Please enter a valid amount (min ₹2).');
+                showAlert('Please enter a valid amount (min ₹2).');
                 return;
             }
             const upiId = "8423609308@ybl";
@@ -311,32 +430,33 @@
         async function confirmAndAddMinutes() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
             if (!baseAmount || baseAmount < 2) {
-                alert('Please enter the recharge amount first.');
+                showAlert('Please enter the recharge amount first.');
                 return;
             }
 
-            if (!confirm(`Kya aapne ₹${calculatedTotal.toFixed(2)} ka payment successfully kar diya hai?`)) {
-                return;
-            }
+            showConfirm(`Kya aapne ₹${calculatedTotal.toFixed(2)} ka payment successfully kar diya hai?`, async (confirmed) => {
+                if (!confirmed) return;
 
-            try {
-                const res = await fetch('/api/add-recharge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, baseAmount })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    alert(data.message);
-                    document.getElementById('minutes-count').innerText = data.newBalance.toFixed(2);
-                    document.getElementById('recharge-amount').value = '';
-                    document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
-                } else {
-                    alert(data.error);
+                try {
+                    const res = await fetch('/api/add-recharge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, baseAmount })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        showAlert(data.message);
+                        document.getElementById('minutes-count').innerText = data.newBalance.toFixed(2);
+                        document.getElementById('recharge-amount').value = '';
+                        document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
+                        checkPoolStatus();
+                    } else {
+                        showAlert(data.error);
+                    }
+                } catch (err) {
+                    showAlert('Error adding minutes.');
                 }
-            } catch (err) {
-                alert('Error adding minutes.');
-            }
+            });
         }
 
         async function makeCall() {
@@ -346,7 +466,7 @@
             const statusEl = document.getElementById('call-status');
 
             if (userPhone.length !== 10 || phoneNumber.length !== 10) {
-                alert('Please enter valid 10-digit numbers.');
+                showAlert('Please enter valid 10-digit numbers.');
                 return;
             }
 
@@ -397,10 +517,10 @@
 
                     let pressTimer;
                     const startPress = () => {
-                        pressTimer = setTimeout(async () => {
-                            if (confirm(`Kya aap ${item.phoneNumber} ki is history ko delete karna chahte hain?`)) {
-                                await deleteHistory(item._id);
-                            }
+                        pressTimer = setTimeout(() => {
+                            showConfirm(`Kya aap ${item.phoneNumber} ki is history ko delete karna chahte hain?`, async (confirmed) => {
+                                if (confirmed) await deleteHistory(item._id);
+                            });
                         }, 600);
                     };
 
@@ -423,10 +543,10 @@
                 if (res.ok) {
                     loadHistory();
                 } else {
-                    alert('Failed to delete history');
+                    showAlert('Failed to delete history');
                 }
             } catch (err) {
-                alert('Error deleting history');
+                showAlert('Error deleting history');
             }
         }
 
