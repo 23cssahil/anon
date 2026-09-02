@@ -11,7 +11,6 @@
         input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
         button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
-        .recharge-group { display: flex; gap: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
     </style>
@@ -21,39 +20,46 @@
     <div class="container" id="app">
         <h2>User Dashboard</h2>
         
+        <!-- Login Section -->
         <div id="login-section" class="section">
             <h3>Login to Continue</h3>
             <button onclick="mockLogin()">Sign in with Google (Demo)</button>
         </div>
 
+        <!-- Dashboard Main Section -->
         <div id="dashboard-section" style="display:none;">
-            <div class="section">
-                <h3 id="welcome-msg">Hello, User</h3>
-                <p><strong>Token Balance:</strong> <span id="token-count">0</span> Tokens</p>
-            </div>
-
-            <div class="section">
-                <h3>Recharge Tokens</h3>
-                <div class="recharge-group">
-                    <button onclick="recharge(50)">₹50 (50 Tkn)</button>
-                    <button onclick="recharge(100)">₹100 (100 Tkn)</button>
-                    <button onclick="recharge(500)">₹500 (500 Tkn)</button>
+            <div class="section" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 id="welcome-msg" style="margin: 0;">Hello, User</h3>
+                    <p style="margin: 5px 0 0 0;"><strong>Token Balance:</strong> <span id="token-count">0</span> Tokens</p>
                 </div>
+                <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
+            <!-- Recharge Section with Min ₹50 Limit -->
+            <div class="section">
+                <h3>Recharge Tokens / Balance</h3>
+                <p style="color: #666; font-size: 14px; margin: 5px 0;">Minimum recharge amount is <strong>₹50</strong> (1 Token = ₹10)</p>
+                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹50)" min="50">
+                <button onclick="rechargeWallet()" style="background: #ffc107; color: #000;">Recharge Now</button>
+            </div>
+
+            <!-- Make Call Section (Supports Edesy Party A & Party B) -->
             <div class="section">
                 <h3>Make an Anonymous Call</h3>
-                <input type="text" id="phone-number" placeholder="Enter 10-digit mobile number" maxlength="10">
+                <input type="text" id="user-phone" placeholder="Enter your 10-digit mobile number (Party A)" maxlength="10">
+                <input type="text" id="phone-number" placeholder="Enter target 10-digit mobile number (Party B)" maxlength="10">
                 <button onclick="makeCall()" style="background: #28a745;">Call Now</button>
-                <p id="call-status" style="font-weight: bold; color: #555;"></p>
+                <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px;"></p>
             </div>
 
+            <!-- History Section -->
             <div class="section">
                 <h3>Call History</h3>
                 <table>
                     <thead>
                         <tr>
-                            <th>Number</th>
+                            <th>Target Number</th>
                             <th>Duration</th>
                             <th>Tokens</th>
                             <th>Date</th>
@@ -90,59 +96,119 @@
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
 
-            const res = await fetch(`/api/balance/${userId}`);
-            const data = await res.json();
-            document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
-            document.getElementById('token-count').innerText = data.tokens;
-
-            loadHistory();
+            try {
+                const res = await fetch(`/api/balance/${userId}`);
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
+                    document.getElementById('token-count').innerText = data.tokens;
+                    loadHistory();
+                } else {
+                    logout();
+                }
+            } catch (err) {
+                console.error("Error loading dashboard data:", err);
+            }
         }
 
-        function recharge(amount) {
-            alert(`Redirecting to Edesy Payment Gateway for ₹${amount}...`);
-            window.location.href = `https://edesy.com/pay?amount=${amount}&user=${userId}`;
+        // Recharge Wallet Logic with Min ₹50 Validation
+        async function rechargeWallet() {
+            const amountInput = document.getElementById('recharge-amount');
+            const amount = Number(amountInput.value);
+
+            if (!amount || amount < 50) {
+                alert('Minimum recharge amount is ₹50.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/recharge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, amount })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Successfully recharged ₹${amount}! Added ${data.addedTokens} tokens.`);
+                    document.getElementById('token-count').innerText = data.remainingTokens;
+                    amountInput.value = '';
+                } else {
+                    alert(data.error || 'Recharge failed.');
+                }
+            } catch (err) {
+                console.error('Recharge error:', err);
+                alert('Server error during recharge.');
+            }
         }
 
+        // Make Real Call via Edesy API
         async function makeCall() {
-            const phoneNumber = document.getElementById('phone-number').value;
+            const userPhone = document.getElementById('user-phone').value.trim();
+            const phoneNumber = document.getElementById('phone-number').value.trim();
             const statusEl = document.getElementById('call-status');
 
-            if (phoneNumber.length !== 10 || isNaN(phoneNumber)) {
-                alert('Please enter a valid 10-digit Indian phone number.');
+            if (userPhone.length !== 10 || phoneNumber.length !== 10 || isNaN(userPhone) || isNaN(phoneNumber)) {
+                alert('Please enter valid 10-digit mobile numbers for both fields.');
                 return;
             }
 
             statusEl.innerText = "Connecting via Edesy Masking API...";
+            statusEl.style.color = "#007bff";
 
-            const res = await fetch('/api/call', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, phoneNumber })
-            });
+            try {
+                const res = await fetch('/api/call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, userPhone, phoneNumber })
+                });
 
-            const data = await res.json();
-            if (data.success) {
-                statusEl.innerText = "Call Connected! Active...";
-                document.getElementById('token-count').innerText = data.remainingTokens;
-                loadHistory();
-            } else {
-                statusEl.innerText = data.error;
+                const data = await res.json();
+                if (res.ok) {
+                    statusEl.innerText = data.message;
+                    statusEl.style.color = "#28a745";
+                    document.getElementById('token-count').innerText = data.remainingTokens;
+                    loadHistory();
+                } else {
+                    statusEl.innerText = data.error;
+                    statusEl.style.color = "#dc3545";
+                }
+            } catch (err) {
+                console.error('Call connection error:', err);
+                statusEl.innerText = "Network error while connecting call.";
+                statusEl.style.color = "#dc3545";
             }
         }
 
+        // Load Call History
         async function loadHistory() {
-            const res = await fetch(`/api/history/${userId}`);
-            const history = await res.json();
-            const tbody = document.getElementById('history-table');
-            tbody.innerHTML = '';
-            history.forEach(item => {
-                tbody.innerHTML += `<tr>
-                    <td>${item.phoneNumber}</td>
-                    <td>${item.duration}</td>
-                    <td>${item.tokensUsed}</td>
-                    <td>${new Date(item.date).toLocaleDateString()}</td>
-                </tr>`;
-            });
+            try {
+                const res = await fetch(`/api/history/${userId}`);
+                const history = await res.json();
+                const tbody = document.getElementById('history-table');
+                tbody.innerHTML = '';
+                
+                if (history.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No call history found.</td></tr>`;
+                    return;
+                }
+
+                history.forEach(item => {
+                    tbody.innerHTML += `<tr>
+                        <td>${item.phoneNumber}</td>
+                        <td>${item.duration}</td>
+                        <td>${item.tokensUsed}</td>
+                        <td>${new Date(item.date).toLocaleDateString()}</td>
+                    </tr>`;
+                });
+            } catch (err) {
+                console.error('Error fetching history:', err);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('userId');
+            window.location.reload();
         }
     </script>
 </body>
