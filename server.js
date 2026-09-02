@@ -500,11 +500,23 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             })
         });
 
+         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                party_a: decryptedPhone,
+                party_b: phoneNumber,
+                max_duration: durationLimitMinutes
+            })
+        });
+
         const edesyData = await edesyResponse.json();
         if (!edesyResponse.ok) {
             return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
         }
-
         // ========== BILLING LOGIC: ₹3 PER MINUTE ==========
         let billedMinutes = 1; 
         
