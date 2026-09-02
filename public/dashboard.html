@@ -10,13 +10,15 @@
         body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .section { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
-        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
         button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
         .hint-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 13px; color: #333; margin-bottom: 10px; }
         label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; user-select: none; }
+        tr.history-row { cursor: pointer; transition: background 0.2s; }
+        tr.history-row:hover { background: #f1f3f5; }
     </style>
 </head>
 <body>
@@ -44,7 +46,7 @@
                 <div class="hint-box">
                     <strong>📱 Steps to Recharge:</strong><br>
                     1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
-                    2. UTR daalne ke baad recharge <b>Pending</b> rahega. Jaise hi aapke paise milenge, Admin approve karega aur minutes add ho jayenge!
+                    2. UTR daalne ke baad recharge Pending rahega. Admin approval ke baad minutes mil jayenge.
                 </div>
                 <input type="number" id="recharge-amount" placeholder="Enter amount paid in ₹ (Min ₹10)" min="10">
                 <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID / UTR">
@@ -59,14 +61,23 @@
                 
                 <label>2. Target Mobile Number (Party B):</label>
                 <input type="text" id="phone-number" placeholder="Enter target 10-digit number" maxlength="10">
+
+                <label>3. Select Call Duration Limit:</label>
+                <select id="max-duration">
+                    <option value="1">1 Minute (Auto-cuts after 1 min)</option>
+                    <option value="2">2 Minutes (Auto-cuts after 2 mins)</option>
+                    <option value="3">3 Minutes (Auto-cuts after 3 mins)</option>
+                    <option value="5">5 Minutes (Auto-cuts after 5 mins)</option>
+                    <option value="unlimited">Unlimited (Talk until balance ends)</option>
+                </select>
                 
                 <button onclick="makeCall()" style="background: #28a745; margin-top: 10px;">Call Now</button>
                 <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px;"></p>
             </div>
 
-            <!-- History Section -->
+            <!-- History Section with Tap & Hold Delete -->
             <div class="section">
-                <h3>Call History</h3>
+                <h3>Call History <span style="font-size: 11px; color: #666; font-weight: normal;">(Tap & Hold any row to delete)</span></h3>
                 <table>
                     <thead>
                         <tr>
@@ -157,6 +168,7 @@
         async function makeCall() {
             const userPhone = document.getElementById('user-phone').value.trim();
             const phoneNumber = document.getElementById('phone-number').value.trim();
+            const maxDuration = document.getElementById('max-duration').value;
             const statusEl = document.getElementById('call-status');
 
             if (userPhone.length !== 10 || phoneNumber.length !== 10) {
@@ -171,11 +183,11 @@
                 const res = await fetch('/api/call', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, userPhone, phoneNumber })
+                    body: JSON.stringify({ userId, userPhone, phoneNumber, maxDuration })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    statusEl.innerText = `Call connected! Duration: ${data.durationMinutes} min, Cost: ₹${data.cost}`;
+                    statusEl.innerText = `Call connected! Limit: ${data.durationMinutes} min, Cost: ₹${data.cost}`;
                     statusEl.style.color = "#28a745";
                     document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
                     loadHistory();
@@ -200,14 +212,52 @@
                     return;
                 }
                 history.forEach(item => {
-                    tbody.innerHTML += `<tr>
+                    const tr = document.createElement('tr');
+                    tr.className = 'history-row';
+                    tr.innerHTML = `
                         <td>${item.phoneNumber}</td>
                         <td>${item.durationMinutes} mins</td>
                         <td>₹${item.cost}</td>
                         <td>${new Date(item.date).toLocaleDateString()}</td>
-                    </tr>`;
+                    `;
+
+                    // Tap and Hold (Long Press) Logic for Deleting History
+                    let pressTimer;
+                    const startPress = () => {
+                        pressTimer = setTimeout(async () => {
+                            if (confirm(`Kya aap ${item.phoneNumber} ki is history ko delete karna chahte hain?`)) {
+                                await deleteHistory(item._id);
+                            }
+                        }, 600); // 600ms hold time
+                    };
+
+                    const cancelPress = () => {
+                        clearTimeout(pressTimer);
+                    };
+
+                    tr.addEventListener('mousedown', startPress);
+                    tr.addEventListener('mouseup', cancelPress);
+                    tr.addEventListener('mouseleave', cancelPress);
+                    tr.addEventListener('touchstart', startPress);
+                    tr.addEventListener('touchend', cancelPress);
+
+                    tbody.appendChild(tr);
                 });
             } catch (err) { console.error(err); }
+        }
+
+        async function deleteHistory(historyId) {
+            try {
+                const res = await fetch(`/api/history/${historyId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (res.ok) {
+                    loadHistory(); // Reload history list
+                } else {
+                    alert(data.error || 'Failed to delete history');
+                }
+            } catch (err) {
+                alert('Error deleting history');
+            }
         }
 
         async function logout() {
