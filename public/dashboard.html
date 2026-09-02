@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Anonymous Call</title>
+    
+    <!-- Firebase App & Auth SDKs via CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
     <style>
         body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -20,10 +25,12 @@
     <div class="container" id="app">
         <h2>User Dashboard</h2>
         
-        <!-- Login Section -->
+        <!-- Login Section with Real Google Auth -->
         <div id="login-section" class="section">
             <h3>Login to Continue</h3>
-            <button onclick="mockLogin()">Sign in with Google (Demo)</button>
+            <button onclick="loginWithGoogle()" style="background: #db4437; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                Sign in with Google
+            </button>
         </div>
 
         <!-- Dashboard Main Section -->
@@ -44,7 +51,7 @@
                 <button onclick="rechargeWallet()" style="background: #ffc107; color: #000;">Recharge Now</button>
             </div>
 
-            <!-- Make Call Section (Supports Edesy Party A & Party B) -->
+            <!-- Make Call Section -->
             <div class="section">
                 <h3>Make an Anonymous Call</h3>
                 <input type="text" id="user-phone" placeholder="Enter your 10-digit mobile number (Party A)" maxlength="10">
@@ -72,23 +79,55 @@
     </div>
 
     <script>
+        // Firebase Configuration from your setup
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
+            authDomain: "anonymous-calling-app-e14de.firebaseapp.com",
+            projectId: "anonymous-calling-app-e14de",
+            storageBucket: "anonymous-calling-app-e14de.firebasestorage.app",
+            messagingSenderId: "1071006820065",
+            appId: "1:1071006820065:web:4a6895517fcd06e0d939a0",
+            measurementId: "G-M3DY3474C4"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
         let userId = localStorage.getItem('userId');
 
         if (userId) {
             loadDashboard();
         }
 
-        async function mockLogin() {
-            const res = await fetch('/auth/google-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: 'test@gmail.com', name: 'Rahul Sharma', googleId: '123456789' })
-            });
-            const data = await res.json();
-            if (data.success) {
-                localStorage.setItem('userId', data.user._id);
-                userId = data.user._id;
-                loadDashboard();
+        // Real Google Login using Firebase Auth Popup
+        async function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try {
+                const result = await firebase.auth().signInWithPopup(provider);
+                const user = result.user;
+
+                // Send Firebase user details to backend to save/fetch from MongoDB
+                const res = await fetch('/auth/google-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: user.email, 
+                        name: user.displayName, 
+                        googleId: user.uid 
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('userId', data.user._id);
+                    userId = data.user._id;
+                    loadDashboard();
+                } else {
+                    alert('Authentication failed on server.');
+                }
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                alert('Google Login failed: ' + error.message);
             }
         }
 
@@ -193,6 +232,7 @@
                     return;
                 }
 
+// Inside history loop
                 history.forEach(item => {
                     tbody.innerHTML += `<tr>
                         <td>${item.phoneNumber}</td>
@@ -206,7 +246,8 @@
             }
         }
 
-        function logout() {
+        async function logout() {
+            await firebase.auth().signOut();
             localStorage.removeItem('userId');
             window.location.reload();
         }
