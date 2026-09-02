@@ -718,7 +718,7 @@
             }
         }
 
-        // Check Pool Status
+       // Check Pool Status (Modified to keep buttons always enabled)
         async function checkPoolStatus() {
             try {
                 const response = await fetch('/api/pool-status');
@@ -730,15 +730,16 @@
                 const rechargeInput = document.getElementById('recharge-amount');
                 const poolWarning = document.getElementById('pool-warning');
 
+                // Buttons ko hamesha enabled rakhein, chahe pool empty ho ya na ho
+                payBtn.disabled = false;
+                addMinBtn.disabled = false;
+                rechargeInput.disabled = false;
+                
+                // Warning message sirf info ke liye dikhega, par blocking nahi hogi
                 if (currentAvailablePool <= 0) {
-                    payBtn.disabled = true;
-                    addMinBtn.disabled = true;
-                    rechargeInput.disabled = true;
                     poolWarning.style.display = 'block';
-                    poolWarning.innerHTML = `<strong>⚠️ Pool Empty:</strong> Available: ₹${currentAvailablePool.toFixed(2)}`;
+                    poolWarning.innerHTML = `<strong>ℹ️ Notice:</strong> Pool is currently ₹${currentAvailablePool.toFixed(2)}, but you can still recharge.`;
                 } else {
-                    payBtn.disabled = false;
-                    rechargeInput.disabled = false;
                     poolWarning.style.display = 'none';
                 }
             } catch (error) {
