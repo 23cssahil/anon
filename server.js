@@ -11,7 +11,23 @@ app.use(express.static('public'));
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
-}).then(() => console.log('MongoDB Connected')).catch(err => console.log(err));
+}).then(async () => {
+    console.log('MongoDB Connected');
+    // Automatic Migration: Fix old history costs where rate wasn't ₹3/min
+    try {
+        const histories = await CallHistory.find({});
+        for (let h of histories) {
+            const expectedCost = Number((h.durationMinutes * 3.00).toFixed(2));
+            if (h.cost !== expectedCost) {
+                h.cost = expectedCost;
+                await h.save();
+            }
+        }
+        console.log('Call history cost migration checked & updated successfully.');
+    } catch (migErr) {
+        console.error('Migration error:', migErr);
+    }
+}).catch(err => console.log(err));
 
 const userSchema = new mongoose.Schema({
     googleId: String,
@@ -62,7 +78,6 @@ async function getTotalAssignedUserMinutes() {
     }
 }
 
-// New API to check real-time pool status for frontend
 app.get('/api/pool-status', async (req, res) => {
     try {
         const edesyTotal = await getEdesyBalance();
@@ -188,6 +203,7 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
+        // Strictly calculated at ₹3.00 per minute
         const callCost = Number((durationLimit * 3.00).toFixed(2));
 
         user.minutes -= durationLimit;
