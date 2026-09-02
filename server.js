@@ -507,12 +507,22 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
                 max_duration: durationLimitMinutes
             })
         });
-        
-        const edesyData = await edesyResponse.json();
-        if (!edesyResponse.ok) {
-            return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
-        }
 
+       // --- SAFE PARSING CODE ---
+        const responseText = await edesyResponse.json().catch(() => null); 
+        // Agar Edesy ne JSON nahi diya toh text utha lo
+        let edesyData = responseText;
+        
+        if (!edesyResponse.ok) {
+            let errorMsg = 'Call initiation failed';
+            if (typeof edesyData === 'object' && edesyData !== null) {
+                errorMsg = edesyData.message || edesyData.error || JSON.stringify(edesyData);
+            } else {
+                errorMsg = 'Edesy API error occurred';
+            }
+            return res.status(400).json({ error: errorMsg });
+        }
+        
         // ========== BILLING LOGIC ==========
         let billedMinutes = 1; 
         if (actualSecs > 0) {
