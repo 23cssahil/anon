@@ -13,21 +13,30 @@ mongoose.connect(process.env.MONGO_URI, {
     useUnifiedTopology: true
 }).then(() => console.log('MongoDB Connected')).catch(err => console.log(err));
 
-// User Schema (Tokens ki jagah 'minutes' use kiya hai)
+// User Schema (Sirf 1 Free Minute on Signup)
 const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
     name: String,
-    minutes: { type: Number, default: 5 } // Signup par 5 Free Minutes
+    minutes: { type: Number, default: 1 } 
 });
 const User = mongoose.model('User', userSchema);
 
-// Call History Schema (Float duration aur cost ke sath)
+// Transaction Schema to Prevent Duplicate/Fake UTR usage
+const transactionSchema = new mongoose.Schema({
+    txnId: { type: String, unique: true },
+    userId: mongoose.Schema.Types.ObjectId,
+    amount: Number,
+    date: { type: Date, default: Date.now }
+});
+const Transaction = mongoose.model('Transaction', transactionSchema);
+
+// Call History Schema
 const callSchema = new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
     phoneNumber: String,
-    durationMinutes: Number, // Float mein jaise 1.5 mins
-    cost: Number,            // Rupee cost
+    durationMinutes: Number,
+    cost: Number,
     date: { type: Date, default: Date.now }
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
@@ -37,7 +46,7 @@ app.post('/auth/google-login', async (req, res) => {
         const { email, name, googleId } = req.body;
         let user = await User.findOne({ googleId });
         if (!user) {
-            user = new User({ email, name, googleId, minutes: 5 });
+            user = new User({ email, name, googleId, minutes: 1 }); // 1 Free Minute
             await user.save();
         }
         res.json({ success: true, user });
@@ -56,7 +65,7 @@ app.get('/api/balance/:userId', async (req, res) => {
     }
 });
 
-// Manual Recharge Request (User PhonePe karke UTR/Request bhejta hai)
+// Secure PhonePe Manual Recharge Request (Prevents fake/duplicate UTR)
 app.post('/api/recharge-request', async (req, res) => {
     const { userId, amountPaid, txnId } = req.body;
     try {
@@ -64,23 +73,45 @@ app.post('/api/recharge-request', async (req, res) => {
             return res.status(400).json({ error: 'Minimum recharge amount is ₹10.' });
         }
 
+        if (!txnId || txnId.trim().length < 10) {
+            return res.status(400).json({ error: 'Kripya sahi PhonePe Transaction ID (UTR) dalein (kam se kam 10 digits).' });
+        }
+
+        const cleanTxnId = txnId.trim();
+
+        // Check if this Transaction ID is already used
+        const existingTxn = await Transaction.findOne({ txnId: cleanTxnId });
+        if (existingTxn) {
+            return res.status(400).json({ error: 'Yeh Transaction ID pehle hi use ki ja chuki hai!' });
+        }
+
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Maan lijiye ₹2.50 per minute ka rate rakha hai aapne (jisme Edesy + GST + Aapka 10% profit shamil hai)
+        // Save transaction to prevent reuse
+        await Transaction.create({
+            txnId: cleanTxnId,
+            userId,
+            amount: amountPaid
+        });
+
+        // Rate calculation (₹2.50 per minute)
         const ratePerMinute = 2.50; 
-        const minutesToAdd = Number((amountPaid / ratePerMinute).toFixed(2)); // Float mein minutes calculate honge
+        const minutesToAdd = Number((amountPaid / ratePerMinute).toFixed(2));
 
         user.minutes += minutesToAdd;
         await user.save();
 
         res.json({ success: true, remainingMinutes: user.minutes, addedMinutes: minutesToAdd });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'Yeh Transaction ID pehle hi use ho chuki hai!' });
+        }
         res.status(500).json({ error: 'Recharge error' });
     }
 });
 
-// Call Route with Float Minutes Tracking
+// Call Route (Strictly checks if minutes < 1)
 app.post('/api/call', async (req, res) => {
     const { userId, userPhone, phoneNumber } = req.body;
     
@@ -89,14 +120,13 @@ app.post('/api/call', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (user.minutes < 1) {
-            return res.status(400).json({ error: 'Insufficient minutes. Please recharge via PhonePe.' });
+            return res.status(400).json({ error: 'Aapka 1 free minute khatam ho chuka hai! Kripya PhonePe se recharge karein.' });
         }
 
         if (!process.env.EDESY_API_KEY) {
             return res.status(500).json({ error: 'Edesy API Key is missing on server.' });
         }
 
-        // Edesy API Call
         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
             method: 'POST',
             headers: {
@@ -111,9 +141,8 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
-        // Maan lijiye call ki average duration 1.5 minutes maap kar deduct ki ya standard 1 min
         const usedMinutes = 1.0; 
-        const callCost = Number((usedMinutes * 2.50).toFixed(2)); // Cost calculation
+        const callCost = Number((usedMinutes * 2.50).toFixed(2));
 
         user.minutes -= usedMinutes;
         await user.save();

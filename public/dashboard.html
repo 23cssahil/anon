@@ -33,7 +33,7 @@
             <div class="section" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h3 id="welcome-msg" style="margin: 0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes <span style="font-size: 11px; color: #28a745;">(1 Free Minute)</span></p>
                 </div>
                 <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
@@ -43,11 +43,11 @@
                 <h3>Recharge via PhonePe (UPI)</h3>
                 <div class="hint-box">
                     <strong>📱 Steps to Recharge:</strong><br>
-                    1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b> (Ya apna QR code lagayein)<br>
-                    2. Enter the amount paid and Transaction ID (UTR) below to get minutes instantly.
+                    1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
+                    2. Enter amount paid and correct PhonePe Transaction ID (UTR) below. Faltu ya duplicate ID accept nahi hogi.
                 </div>
                 <input type="number" id="recharge-amount" placeholder="Enter amount paid in ₹ (Min ₹10)" min="10">
-                <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID (UTR)">
+                <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID / UTR">
                 <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Verify & Add Minutes</button>
             </div>
 
@@ -64,7 +64,7 @@
                 <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px;"></p>
             </div>
 
-            <!-- History Section showing Float Minutes & Cost -->
+            <!-- History Section -->
             <div class="section">
                 <h3>Call History</h3>
                 <table>
@@ -135,7 +135,7 @@
             const txnId = document.getElementById('txn-id').value.trim();
 
             if (!amountPaid || amountPaid < 10 || !txnId) {
-                alert('Please enter a valid amount (min ₹10) and PhonePe Transaction ID.');
+                alert('Please enter a valid amount (min ₹10) and Transaction ID.');
                 return;
             }
 
