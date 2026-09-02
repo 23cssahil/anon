@@ -449,7 +449,7 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Pehle Terms of Service accept karni hongi.' });
         }
 
-        // --- Bulletproof Safe Decryption Fallback ---
+        // --- Safe Phone Decryption Fallback ---
         let rawPhone = user.verifiedPhone || user.phone || '9999999999';
         let decryptedPhone;
         try {
@@ -465,7 +465,7 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             decryptedPhone = '9999999999';
         }
 
-        // Minimum ₹3 required
+        // Minimum balance check
         if (user.balance < ACTUAL_RATE_PER_MINUTE) {
             return res.status(400).json({
                 error: `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
@@ -500,26 +500,13 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             })
         });
 
-         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                party_a: decryptedPhone,
-                party_b: phoneNumber,
-                max_duration: durationLimitMinutes
-            })
-        });
-
         const edesyData = await edesyResponse.json();
         if (!edesyResponse.ok) {
             return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
         }
-        // ========== BILLING LOGIC: ₹3 PER MINUTE ==========
+
+        // ========== BILLING LOGIC ==========
         let billedMinutes = 1; 
-        
         if (actualSecs > 0) {
             billedMinutes = Math.ceil(actualSecs / 60); 
         }
