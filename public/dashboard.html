@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Anonymous Call</title>
-    
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-
     <style>
         body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -15,7 +13,7 @@
         input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
         button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
-        .hint-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 13px; color: #333; margin-bottom: 10px; line-height: 1.4; }
+        .hint-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 13px; color: #333; margin-bottom: 10px; }
         label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
@@ -35,39 +33,38 @@
             <div class="section" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h3 id="welcome-msg" style="margin: 0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="token-count">0</span> Tokens (₹1 = 1 Token)</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes</p>
                 </div>
                 <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
+            <!-- PhonePe Recharge Section -->
             <div class="section">
-                <h3>Recharge Wallet</h3>
-                <p style="color: #666; font-size: 13px; margin: 5px 0;">Min recharge: <strong>₹5</strong> (Get equal tokens)</p>
-                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹5)" min="5">
-                <button onclick="rechargeWallet()" style="background: #ffc107; color: #000;">Recharge Now</button>
+                <h3>Recharge via PhonePe (UPI)</h3>
+                <div class="hint-box">
+                    <strong>📱 Steps to Recharge:</strong><br>
+                    1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b> (Ya apna QR code lagayein)<br>
+                    2. Enter the amount paid and Transaction ID (UTR) below to get minutes instantly.
+                </div>
+                <input type="number" id="recharge-amount" placeholder="Enter amount paid in ₹ (Min ₹10)" min="10">
+                <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID (UTR)">
+                <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Verify & Add Minutes</button>
             </div>
 
+            <!-- Call Section -->
             <div class="section">
                 <h3>Make an Anonymous Call</h3>
+                <label>1. Your Mobile Number (Party A):</label>
+                <input type="text" id="user-phone" placeholder="Enter your 10-digit number" maxlength="10">
                 
-                <!-- Clear Guidance Box added here -->
-                <div class="hint-box">
-                    <strong>⚠️ How it works:</strong><br>
-                    1. <b>Your Number:</b> Enter your own phone number where Edesy will ring you first.<br>
-                    2. <b>Target Number:</b> Enter the person's number whom you want to call anonymously.<br>
-                    3. Once you pick up your incoming call, it will automatically connect to the target.
-                </div>
-                
-                <label>1. Your Mobile Number (Aapka Khud Ka Number):</label>
-                <input type="text" id="user-phone" placeholder="e.g., 9876543210 (Aapka number)" maxlength="10">
-                
-                <label>2. Target Mobile Number (Jisko Anonymously Call Karni Hai):</label>
-                <input type="text" id="phone-number" placeholder="e.g., 9123456789 (Samne wale ka number)" maxlength="10">
+                <label>2. Target Mobile Number (Party B):</label>
+                <input type="text" id="phone-number" placeholder="Enter target 10-digit number" maxlength="10">
                 
                 <button onclick="makeCall()" style="background: #28a745; margin-top: 10px;">Call Now</button>
                 <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px;"></p>
             </div>
 
+            <!-- History Section showing Float Minutes & Cost -->
             <div class="section">
                 <h3>Call History</h3>
                 <table>
@@ -75,7 +72,7 @@
                         <tr>
                             <th>Target Number</th>
                             <th>Duration</th>
-                            <th>Tokens</th>
+                            <th>Cost</th>
                             <th>Date</th>
                         </tr>
                     </thead>
@@ -116,9 +113,7 @@
                     userId = data.user._id;
                     loadDashboard();
                 }
-            } catch (error) {
-                alert('Login failed: ' + error.message);
-            }
+            } catch (error) { alert('Login failed: ' + error.message); }
         }
 
         async function loadDashboard() {
@@ -129,31 +124,35 @@
                 const data = await res.json();
                 if (res.ok) {
                     document.getElementById('welcome-msg').innerText = `Hello, ${data.name}`;
-                    document.getElementById('token-count').innerText = data.tokens;
+                    document.getElementById('minutes-count').innerText = data.minutes.toFixed(2);
                     loadHistory();
-                } else {
-                    logout();
-                }
+                } else { logout(); }
             } catch (err) { console.error(err); }
         }
 
-        async function rechargeWallet() {
-            const amountInput = document.getElementById('recharge-amount');
-            const amount = Number(amountInput.value);
-            if (!amount || amount < 5) { alert('Minimum recharge is ₹5.'); return; }
+        async function requestRecharge() {
+            const amountPaid = Number(document.getElementById('recharge-amount').value);
+            const txnId = document.getElementById('txn-id').value.trim();
+
+            if (!amountPaid || amountPaid < 10 || !txnId) {
+                alert('Please enter a valid amount (min ₹10) and PhonePe Transaction ID.');
+                return;
+            }
+
             try {
-                const res = await fetch('/api/recharge', {
+                const res = await fetch('/api/recharge-request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, amount })
+                    body: JSON.stringify({ userId, amountPaid, txnId })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(`Recharged ₹${amount} successfully! Added ${data.addedTokens} tokens.`);
-                    document.getElementById('token-count').innerText = data.remainingTokens;
-                    amountInput.value = '';
+                    alert(`Recharge successful! Added ${data.addedMinutes} Minutes.`);
+                    document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
+                    document.getElementById('recharge-amount').value = '';
+                    document.getElementById('txn-id').value = '';
                 } else { alert(data.error); }
-            } catch (err) { alert('Recharge error.'); }
+            } catch (err) { alert('Recharge request failed.'); }
         }
 
         async function makeCall() {
@@ -162,11 +161,11 @@
             const statusEl = document.getElementById('call-status');
 
             if (userPhone.length !== 10 || phoneNumber.length !== 10) {
-                alert('Please enter valid 10-digit numbers in both fields.');
+                alert('Please enter valid 10-digit numbers.');
                 return;
             }
 
-            statusEl.innerText = "Initiating... Your phone will ring first!";
+            statusEl.innerText = "Calling your phone first...";
             statusEl.style.color = "#007bff";
 
             try {
@@ -177,9 +176,9 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    statusEl.innerText = "Call triggered! Please pick up the incoming call on your phone.";
+                    statusEl.innerText = `Call connected! Duration: ${data.durationMinutes} min, Cost: ₹${data.cost}`;
                     statusEl.style.color = "#28a745";
-                    document.getElementById('token-count').innerText = data.remainingTokens;
+                    document.getElementById('minutes-count').innerText = data.remainingMinutes.toFixed(2);
                     loadHistory();
                 } else {
                     statusEl.innerText = data.error;
@@ -204,8 +203,8 @@
                 history.forEach(item => {
                     tbody.innerHTML += `<tr>
                         <td>${item.phoneNumber}</td>
-                        <td>${item.duration}</td>
-                        <td>${item.tokensUsed}</td>
+                        <td>${item.durationMinutes} mins</td>
+                        <td>₹${item.cost}</td>
                         <td>${new Date(item.date).toLocaleDateString()}</td>
                     </tr>`;
                 });

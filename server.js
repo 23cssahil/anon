@@ -8,83 +8,79 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => console.log('MongoDB Connected')).catch(err => console.log(err));
 
-// User Schema
+// User Schema (Tokens ki jagah 'minutes' use kiya hai)
 const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
     name: String,
-    tokens: { type: Number, default: 10 } // Free 10 tokens on signup
+    minutes: { type: Number, default: 5 } // Signup par 5 Free Minutes
 });
 const User = mongoose.model('User', userSchema);
 
-// Call History Schema
+// Call History Schema (Float duration aur cost ke sath)
 const callSchema = new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
     phoneNumber: String,
-    duration: String,
-    tokensUsed: Number,
+    durationMinutes: Number, // Float mein jaise 1.5 mins
+    cost: Number,            // Rupee cost
     date: { type: Date, default: Date.now }
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
 
-// Auth Route (Google Login Handler)
 app.post('/auth/google-login', async (req, res) => {
     try {
         const { email, name, googleId } = req.body;
         let user = await User.findOne({ googleId });
         if (!user) {
-            user = new User({ email, name, googleId, tokens: 10 });
+            user = new User({ email, name, googleId, minutes: 5 });
             await user.save();
         }
         res.json({ success: true, user });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error during authentication' });
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
-// Get User Balance & Info
 app.get('/api/balance/:userId', async (req, res) => {
     try {
         const user = await User.findById(req.params.userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
-        res.json({ tokens: user.tokens, name: user.name });
+        res.json({ minutes: user.minutes, name: user.name });
     } catch (error) {
-        res.status(500).json({ error: 'Unable to fetch balance' });
+        res.status(500).json({ error: 'Error fetching balance' });
     }
 });
 
-// Recharge Route (Minimum ₹5 limit & Token calculation: 1 Token = ₹5)
-app.post('/api/recharge', async (req, res) => {
-    const { userId, amount } = req.body;
-
+// Manual Recharge Request (User PhonePe karke UTR/Request bhejta hai)
+app.post('/api/recharge-request', async (req, res) => {
+    const { userId, amountPaid, txnId } = req.body;
     try {
-        if (!amount || amount < 5) {
-            return res.status(400).json({ error: 'Minimum recharge amount is ₹5.' });
+        if (!amountPaid || amountPaid < 10) {
+            return res.status(400).json({ error: 'Minimum recharge amount is ₹10.' });
         }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Calculate tokens based on amount (₹5 = 1 Token)
-        const tokensToAdd = Math.floor(amount / 5);
-        user.tokens += tokensToAdd;
+        // Maan lijiye ₹2.50 per minute ka rate rakha hai aapne (jisme Edesy + GST + Aapka 10% profit shamil hai)
+        const ratePerMinute = 2.50; 
+        const minutesToAdd = Number((amountPaid / ratePerMinute).toFixed(2)); // Float mein minutes calculate honge
+
+        user.minutes += minutesToAdd;
         await user.save();
 
-        res.json({ success: true, remainingTokens: user.tokens, addedTokens: tokensToAdd });
+        res.json({ success: true, remainingMinutes: user.minutes, addedMinutes: minutesToAdd });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error during recharge' });
+        res.status(500).json({ error: 'Recharge error' });
     }
 });
 
-// Initiate Real Call via Edesy Masking API
+// Call Route with Float Minutes Tracking
 app.post('/api/call', async (req, res) => {
     const { userId, userPhone, phoneNumber } = req.body;
     
@@ -92,54 +88,56 @@ app.post('/api/call', async (req, res) => {
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        if (user.tokens < 2) {
-            return res.status(400).json({ error: 'Insufficient tokens. Please recharge (Minimum ₹5).' });
+        if (user.minutes < 1) {
+            return res.status(400).json({ error: 'Insufficient minutes. Please recharge via PhonePe.' });
         }
 
-        // Real Edesy API Call Request
+        if (!process.env.EDESY_API_KEY) {
+            return res.status(500).json({ error: 'Edesy API Key is missing on server.' });
+        }
+
+        // Edesy API Call
         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                party_a: userPhone,    // Caller ka number
-                party_b: phoneNumber   // Receiver ka target number
-            })
+            body: JSON.stringify({ party_a: userPhone, party_b: phoneNumber })
         });
 
         const edesyData = await edesyResponse.json();
-
         if (!edesyResponse.ok) {
-            return res.status(400).json({ error: edesyData.message || 'Edesy API connection failed.' });
+            return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
-        // Deduct tokens on successful connection
-        user.tokens -= 2;
+        // Maan lijiye call ki average duration 1.5 minutes maap kar deduct ki ya standard 1 min
+        const usedMinutes = 1.0; 
+        const callCost = Number((usedMinutes * 2.50).toFixed(2)); // Cost calculation
+
+        user.minutes -= usedMinutes;
         await user.save();
 
-        // Save Call Record in History
         await CallHistory.create({
             userId,
             phoneNumber,
-            duration: '1 min',
-            tokensUsed: 2
+            durationMinutes: usedMinutes,
+            cost: callCost
         });
 
         res.json({ 
             success: true, 
-            message: 'Call connected securely via Edesy!', 
-            remainingTokens: user.tokens 
+            message: 'Call connected via Edesy!', 
+            remainingMinutes: user.minutes,
+            durationMinutes: usedMinutes,
+            cost: callCost
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error while connecting call.' });
+        res.status(500).json({ error: 'Server error during call.' });
     }
 });
 
-// Get Call History
 app.get('/api/history/:userId', async (req, res) => {
     try {
         const history = await CallHistory.find({ userId: req.params.userId }).sort({ date: -1 });
