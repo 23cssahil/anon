@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
     name: String,
-    minutes: { type: Number, default: 1 } // 1 Free Minute on Signup
+    minutes: { type: Number, default: 0 }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -30,12 +30,58 @@ const callSchema = new mongoose.Schema({
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
 
+// 1. Fetch Total Edesy Balance from API
+async function getEdesyBalance() {
+    try {
+        const response = await fetch('https://voice-api.edesy.in/v1/balance', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (response.ok) {
+            return Number(data.minutes || data.balance || 0);
+        }
+        return 0;
+    } catch (err) {
+        console.error('Error fetching Edesy balance:', err);
+        return 0;
+    }
+}
+
+// 2. Calculate Total Minutes currently assigned to all Users in Database
+async function getTotalAssignedUserMinutes() {
+    try {
+        const result = await User.aggregate([
+            { $group: { _id: null, totalMinutes: { $sum: "$minutes" } } }
+        ]);
+        return result.length > 0 ? Number(result[0].totalMinutes) : 0;
+    } catch (err) {
+        console.error('Error calculating assigned user minutes:', err);
+        return 0;
+    }
+}
+
+// Google Login & Signup Route with Free Minute Pool Check
 app.post('/auth/google-login', async (req, res) => {
     try {
         const { email, name, googleId } = req.body;
         let user = await User.findOne({ googleId });
+        
         if (!user) {
-            user = new User({ email, name, googleId, minutes: 1 });
+            const edesyTotal = await getEdesyBalance();
+            const assignedTotal = await getTotalAssignedUserMinutes();
+            const availablePool = edesyTotal - assignedTotal;
+
+            let freeMinutes = 0;
+            // Agar Edesy total mein se users ke minutes hatane ke baad bhi pool mein >= 1 minute bacha hai, tabhi free do
+            if (availablePool >= 1) {
+                freeMinutes = 1;
+            }
+
+            user = new User({ email, name, googleId, minutes: freeMinutes });
             await user.save();
         }
         res.json({ success: true, user });
@@ -54,7 +100,7 @@ app.get('/api/balance/:userId', async (req, res) => {
     }
 });
 
-// Direct Instant Recharge API (Adds minutes based on baseAmount @ ₹3/min)
+// Recharge Route with Dynamic Pool Comparison (Edesy Total vs Total Assigned Users)
 app.post('/api/add-recharge', async (req, res) => {
     const { userId, baseAmount } = req.body;
     try {
@@ -62,12 +108,23 @@ app.post('/api/add-recharge', async (req, res) => {
             return res.status(400).json({ error: 'Minimum recharge amount is ₹2.' });
         }
 
-        const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ error: 'User not found' });
-
-        // Rate: ₹3.00 per minute
         const ratePerMinute = 3.00;
         const minutesToAdd = Number((baseAmount / ratePerMinute).toFixed(2));
+
+        // Get Edesy Total and Total Assigned to current users
+        const edesyTotal = await getEdesyBalance();
+        const assignedTotal = await getTotalAssignedUserMinutes();
+        const availablePool = Number((edesyTotal - assignedTotal).toFixed(2));
+
+        // Check if user is asking for more than the remaining real pool
+        if (minutesToAdd > availablePool) {
+            return res.status(400).json({ 
+                error: `Is time aap ${minutesToAdd} minutes add nahi kar sakte. Edesy Total: ${edesyTotal}, Already Assigned to Users: ${assignedTotal}, Abhi available pool mein sirf: ${availablePool} minutes bache hain.` 
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
         user.minutes += minutesToAdd;
         await user.save();
@@ -91,7 +148,7 @@ app.post('/api/call', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (user.minutes < 1) {
-            return res.status(400).json({ error: 'Aapka 1 free minute aur balance khatam ho chuka hai! Kripya recharge karein.' });
+            return res.status(400).json({ error: 'Aapka balance khatam ho chuka hai! Kripya recharge karein.' });
         }
 
         let durationLimit = 1.0;
@@ -101,7 +158,7 @@ app.post('/api/call', async (req, res) => {
         } else {
             durationLimit = Number(maxDuration);
             if (user.minutes < durationLimit) {
-                return res.status(400).json({ error: `Aapke paas sirf ${user.minutes.toFixed(2)} minutes bache hain, aap ${durationLimit} minutes select nahi kar sakte.` });
+                return res.status(400).json({ error: `Aapke paas sirf ${user.minutes.toFixed(2)} minutes bache hain.` });
             }
         }
 
