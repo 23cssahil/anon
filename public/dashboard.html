@@ -19,7 +19,7 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; user-select: none; }
         tr.history-row { cursor: pointer; transition: background 0.2s; }
         tr.history-row:hover { background: #f1f3f5; }
-        .gst-text { font-size: 12px; color: #d9534f; margin-top: -3px; margin-bottom: 5px; font-weight: bold; }
+        .gst-text { font-size: 13px; color: #d9534f; margin: 5px 0; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -41,19 +41,20 @@
                 <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
-            <!-- PhonePe Recharge Section with GST -->
+            <!-- Direct PhonePe Recharge Section -->
             <div class="section">
-                <h3>Recharge via PhonePe (UPI)</h3>
+                <h3>Recharge via PhonePe</h3>
                 <div class="hint-box">
-                    <strong>📱 Steps to Recharge:</strong><br>
-                    1. Min amount: <b>₹2</b> (Rate: ₹3/min). 18% GST will be added.<br>
-                    2. Pay the total amount via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
-                    3. Enter amount and UTR below. Admin approval ke baad minutes mil jayenge.
+                    <strong>📱 Quick Recharge Steps:</strong><br>
+                    1. Enter your amount (Min ₹2). 18% GST will be added.<br>
+                    2. Click <b>"Pay via PhonePe"</b> to pay directly to UPI: <b>8423609308@ybl</b><br>
+                    3. After successful payment, click <b>"I Have Paid - Add Minutes"</b> to get your minutes instantly!
                 </div>
                 <input type="number" id="recharge-amount" placeholder="Enter base amount in ₹ (Min ₹2)" min="2" oninput="calculateGst()">
                 <div id="gst-display" class="gst-text">Total to Pay (inc. 18% GST): ₹0.00</div>
-                <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID / UTR">
-                <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Submit Recharge Request</button>
+                
+                <button onclick="payViaPhonePe()" style="background: #5f259f; color: #fff;">Pay via PhonePe</button>
+                <button onclick="confirmAndAddMinutes()" style="background: #28a745; color: #fff; margin-top: 5px;">I Have Paid - Add Minutes</button>
             </div>
 
             <!-- Call Section -->
@@ -110,6 +111,7 @@
 
         let userId = localStorage.getItem('userId');
         if (userId) loadDashboard();
+        let calculatedTotal = 0;
 
         async function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -147,38 +149,60 @@
         function calculateGst() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
             if (!baseAmount || baseAmount <= 0) {
+                calculatedTotal = 0;
                 document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
                 return;
             }
             const gst = baseAmount * 0.18;
-            const total = baseAmount + gst;
+            calculatedTotal = baseAmount + gst;
             const estimatedMinutes = (baseAmount / 3.00).toFixed(2);
-            document.getElementById('gst-display').innerText = `Total to Pay: ₹${total.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
+            document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
         }
 
-        async function requestRecharge() {
+        function payViaPhonePe() {
             const baseAmount = Number(document.getElementById('recharge-amount').value);
-            const txnId = document.getElementById('txn-id').value.trim();
+            if (!baseAmount || baseAmount < 2) {
+                alert('Please enter a valid amount (min ₹2).');
+                return;
+            }
+            // UPI Intent Link for PhonePe / UPI Apps
+            const upiId = "8423609308@ybl";
+            const payeeName = "Anonymous Call";
+            const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${calculatedTotal.toFixed(2)}&cu=INR`;
+            
+            // Open UPI App
+            window.location.href = upiUrl;
+        }
 
-            if (!baseAmount || baseAmount < 2 || !txnId) {
-                alert('Please enter a valid amount (min ₹2) and Transaction ID.');
+        async function confirmAndAddMinutes() {
+            const baseAmount = Number(document.getElementById('recharge-amount').value);
+            if (!baseAmount || baseAmount < 2) {
+                alert('Please enter the recharge amount first.');
+                return;
+            }
+
+            if (!confirm(`Kya aapne ₹${calculatedTotal.toFixed(2)} ka payment successfully kar diya hai?`)) {
                 return;
             }
 
             try {
-                const res = await fetch('/api/recharge-request', {
+                const res = await fetch('/api/add-recharge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, baseAmount, txnId })
+                    body: JSON.stringify({ userId, baseAmount })
                 });
                 const data = await res.json();
                 if (res.ok) {
                     alert(data.message);
+                    document.getElementById('minutes-count').innerText = data.newBalance.toFixed(2);
                     document.getElementById('recharge-amount').value = '';
-                    document.getElementById('txn-id').value = '';
                     document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
-                } else { alert(data.error); }
-            } catch (err) { alert('Recharge request failed.'); }
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert('Error adding minutes.');
+            }
         }
 
         async function makeCall() {
