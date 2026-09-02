@@ -450,6 +450,23 @@ app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Pehle Terms of Service accept karni hongi.' });
         }
 
+        // --- Safe Phone Retrieval & Decryption ---
+        let rawPhone = user.verifiedPhone || user.phone || '9999999999'; 
+
+        let decryptedPhone;
+        try {
+            decryptedPhone = decryptSensitiveData(rawPhone);
+            if (!decryptedPhone) {
+                decryptedPhone = rawPhone;
+            }
+        } catch (e) {
+            decryptedPhone = rawPhone;
+        }
+
+        if (!decryptedPhone) {
+            decryptedPhone = '9999999999'; 
+        }
+
         // --- Safe Decryption with Fallback (Server crash nahi hoga ab) ---
         let decryptedPhone;
         try {
