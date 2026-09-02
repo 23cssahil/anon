@@ -223,14 +223,14 @@ async function getEdesyBalance() {
             return 0;
         }
 
-        const response = await fetch('https://voice-api.edesy.in/v1/balance', {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 5000
-        });
+        // const response = await fetch('https://voice-api.edesy.in/v1/balance', {
+        //     method: 'GET',
+        //     headers: {
+        //         'Authorization': `Bearer ${apiKey}`,
+        //         'Content-Type': 'application/json'
+        //     },
+        //     timeout: 5000
+        // });
 
         const data = await response.json();
         if (response.ok) {
