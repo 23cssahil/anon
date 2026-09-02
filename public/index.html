@@ -4,41 +4,586 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anonymous Call - Private Calling Platform</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f7f6; text-align: center; }
-        header { background: #333; color: #fff; padding: 40px 20px; }
-        .cta-btn { background: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 20px; }
-        .features { display: flex; justify-content: center; gap: 20px; padding: 40px; flex-wrap: wrap; }
-        .card { background: white; padding: 20px; width: 250px; border-radius: 8px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); }
-        footer { background: #222; color: #aaa; padding: 15px; margin-top: 40px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .navbar-brand i {
+            font-size: 28px;
+        }
+
+        .navbar-menu a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 0 15px;
+            transition: 0.3s;
+        }
+
+        .navbar-menu a:hover {
+            color: #764ba2;
+        }
+
+        .cta-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .hero-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 80px 0;
+            gap: 50px;
+        }
+
+        .hero-content {
+            flex: 1;
+            color: white;
+        }
+
+        .hero-content h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-content p {
+            font-size: 18px;
+            margin-bottom: 15px;
+            opacity: 0.95;
+        }
+
+        .hero-pricing {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 30px 0;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .hero-btn {
+            background: white;
+            color: #667eea;
+            padding: 14px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 20px;
+            display: inline-block;
+        }
+
+        .hero-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .hero-image {
+            flex: 1;
+            text-align: center;
+        }
+
+        .hero-image i {
+            font-size: 200px;
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .features-section {
+            padding: 80px 0;
+            background: white;
+            border-radius: 15px 15px 0 0;
+            margin-top: 40px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 36px;
+            color: #333;
+            margin-bottom: 50px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: 0.3s;
+            border-top: 4px solid #667eea;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .how-it-works {
+            padding: 80px 0;
+            background: #f9f9f9;
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+        }
+
+        .step {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0 auto 20px;
+        }
+
+        .step h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .step p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .pricing-section {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .pricing-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .pricing-card h3 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .pricing-card p {
+            font-size: 16px;
+            opacity: 0.95;
+            margin-bottom: 20px;
+        }
+
+        .price-detail {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .cta-section {
+            padding: 80px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            margin: 60px 0;
+            color: white;
+        }
+
+        .cta-section h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .cta-section p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        .cta-section button {
+            background: white;
+            color: #667eea;
+            padding: 14px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .cta-section button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .footer {
+            background: #1a1a1a;
+            color: #aaa;
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid #333;
+        }
+
+        .footer h4 {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .footer p {
+            font-size: 14px;
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .footer-links {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #667eea;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #764ba2;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-wrap: wrap;
+                padding: 15px;
+            }
+
+            .navbar-menu {
+                display: none;
+            }
+
+            .hero-section {
+                flex-direction: column;
+                padding: 40px 0;
+                gap: 30px;
+            }
+
+            .hero-content h1 {
+                font-size: 32px;
+            }
+
+            .hero-image i {
+                font-size: 120px;
+            }
+
+            .section-title {
+                font-size: 28px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .steps-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-section {
+                padding: 40px 20px;
+            }
+
+            .cta-section h2 {
+                font-size: 24px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Anonymous Calling - Call Anyone Privately</h1>
-        <p>Your number hidden, ₹1.50/minute</p>
-        <a href="dashboard.html" class="cta-btn">Get Started</a>
-    </header>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div class="navbar-brand">
+            <i class="fas fa-phone-slash"></i>
+            Anonymous Call
+        </div>
+        <div class="navbar-menu">
+            <a href="#features">Features</a>
+            <a href="#how">How It Works</a>
+            <a href="#pricing">Pricing</a>
+            <button class="cta-btn" onclick="window.location.href='/public/dashboard.html'">
+                <i class="fas fa-arrow-right"></i> Dashboard
+            </button>
+        </div>
+    </div>
 
-    <section class="features">
-        <div class="card">
-            <h3>Hidden Caller ID</h3>
-            <p>Samne wale ko aapka real number nahi, ek unknown masking number dikhega.</p>
+    <!-- Hero Section -->
+    <div class="container">
+        <div class="hero-section">
+            <div class="hero-content">
+                <h1>Call Anyone Privately</h1>
+                <p>Your real number stays hidden. Recipient sees a masked number instead.</p>
+                <div class="hero-pricing">₹1.50/minute</div>
+                <p style="font-size: 14px; opacity: 0.9;">No hidden charges • 60-second pulse billing • Instant setup</p>
+                <button class="hero-btn" onclick="window.location.href='/public/dashboard.html'">
+                    <i class="fas fa-play-circle"></i> Start Making Calls
+                </button>
+            </div>
+            <div class="hero-image">
+                <i class="fas fa-mobile-alt"></i>
+            </div>
         </div>
-        <div class="card">
-            <h3>Pay Per Minute</h3>
-            <p>Sirf ₹1.50/min, koi hidden subscription charges nahi.</p>
-        </div>
-        <div class="card">
-            <h3>Instant Setup</h3>
-            <p>Koi app download karne ki zarurat nahi, direct browser se use karein.</p>
-        </div>
-    </section>
+    </div>
 
-    <footer>
-        <p>Powered by Edesy Number Masking API</p>
-    </footer>
+    <!-- Features Section -->
+    <div class="features-section">
+        <div class="container">
+            <h2 class="section-title" id="features">Why Choose Us?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-secret"></i>
+                    </div>
+                    <h3>Complete Privacy</h3>
+                    <p>Your real phone number is completely hidden from the recipient. They see only a masked virtual number.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <h3>Transparent Pricing</h3>
+                    <p>Simple, honest pricing at ₹1.50 per minute. No hidden charges, no surprise fees, no subscriptions.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h3>Bank-Level Security</h3>
+                    <p>Military-grade encryption protects all your data. Your privacy is our highest priority.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>No App Required</h3>
+                    <p>Use directly from your browser on any device. No installation, no downloads, no storage space wasted.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Instant Setup</h3>
+                    <p>Sign up with Google in seconds. Add balance with PhonePe and start calling immediately.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <h3>Call History</h3>
+                    <p>Keep detailed records of all your calls. View cost breakdown and delete records anytime you want.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="how-it-works">
+        <div class="container">
+            <h2 class="section-title" id="how">How It Works</h2>
+            <div class="steps-grid">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Sign In</h3>
+                    <p>Login using your Google account. Takes just a few seconds and is completely secure.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Add Balance</h3>
+                    <p>Recharge your wallet via PhonePe UPI. Minimum amount is just ₹1.50.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Enter Numbers</h3>
+                    <p>Enter your phone and target number. Choose your desired call duration limit.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Receive Call</h3>
+                    <p>You'll get an incoming call first. Answer and you'll be automatically connected.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h3>Call Connected</h3>
+                    <p>Recipient sees a masked number, not your real number. Talk securely.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h3>Auto Disconnect</h3>
+                    <p>Call automatically disconnects when time expires. You're only charged for actual talk time.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="pricing-section">
+        <div class="container">
+            <h2 class="section-title" id="pricing">Simple Transparent Pricing</h2>
+            <div class="pricing-card">
+                <h3>₹1.50</h3>
+                <p>per minute</p>
+                <div class="price-detail">
+                    <strong>60-second pulse billing</strong><br>
+                    Each call is rounded up to nearest minute
+                </div>
+                <div class="price-detail">
+                    ✓ No setup fees<br>
+                    ✓ No connection charges<br>
+                    ✓ No hidden charges<br>
+                    ✓ No subscriptions
+                </div>
+                <button class="hero-btn" style="margin-top: 20px; width: 100%;" onclick="window.location.href='/public/dashboard.html'">
+                    Start Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="container">
+        <div class="cta-section">
+            <h2>Ready to Make Private Calls?</h2>
+            <p>Start calling anonymously in seconds. No setup required.</p>
+            <button onclick="window.location.href='/public/dashboard.html'">
+                <i class="fas fa-play-circle"></i> Open Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <h4>Anonymous Call Platform</h4>
+        <p>Private calling with masked caller ID | ₹1.50/minute | No hidden charges</p>
+        <div class="footer-links">
+            <a href="#privacy">Privacy Policy</a>
+            <a href="#terms">Terms of Service</a>
+            <a href="#contact">Contact Us</a>
+        </div>
+        <p style="margin-top: 30px; font-size: 12px; border-top: 1px solid #333; padding-top: 20px;">
+            This service is provided for lawful purposes only. Users are responsible for complying with all applicable laws and regulations in their jurisdiction.
+        </p>
+        <p style="font-size: 12px; margin-top: 15px;">
+            Powered by <strong>Edesy Number Masking API</strong> | © 2026 Anonymous Call. All rights reserved.
+        </p>
+    </div>
 
 </body>
 </html>
