@@ -3,272 +3,591 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Anonymous Call</title>
-    <!-- Favicon fix to prevent 404 error -->
+    <title>Anonymous Call - Private Calling Platform</title>
     <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #f0f2f5; 
-            margin: 0; 
-            padding: 0; 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             color: #333;
         }
-        .container { 
-            width: 100%; 
-            min-height: 100vh; 
-            background: #ffffff; 
-            padding: 20px; 
-            display: flex;
-            flex-direction: column;
-        }
-        header.app-header {
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 2px solid #eaeaea;
-            padding-bottom: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-size: 22px;
+            font-weight: bold;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-brand i {
+            font-size: 28px;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+
+        .login-card p {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        .google-login-btn {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 14px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            display: inline-block;
+        }
+
+        .google-login-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        #dashboard-section {
+            display: none;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .card h2 {
+            color: #667eea;
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h2 i {
+            font-size: 24px;
+        }
+
+        .balance-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
             margin-bottom: 20px;
         }
-        header.app-header h2 {
-            margin: 0;
-            color: #1a73e8;
+
+        .balance-display .label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
         }
-        .section { 
-            background: #fafafa;
-            border: 1px solid #e0e0e0;
+
+        .balance-display .amount {
+            font-size: 36px;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
             border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            font-size: 14px;
+            transition: 0.3s;
         }
-        .section h3 {
-            margin-top: 0;
-            color: #444;
-            font-size: 18px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
-        }
-        input, select, button { 
-            padding: 12px; 
-            margin: 8px 0; 
-            width: 100%; 
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-        input:focus, select:focus {
-            border-color: #1a73e8;
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #667eea;
             outline: none;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
         }
-        button { 
-            background: #1a73e8; 
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            font-weight: bold; 
-            transition: background 0.2s;
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: 0.3s;
+            width: 100%;
         }
-        button:hover { background: #1557b0; }
-        button:disabled { background: #cccccc !important; cursor: not-allowed; }
-        .hint-box { 
-            background: #e8f0fe; 
-            border-left: 4px solid #1a73e8;
-            padding: 12px; 
-            border-radius: 4px; 
-            font-size: 14px; 
-            color: #174ea6; 
-            margin-bottom: 15px; 
-            line-height: 1.5;
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
+
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #34a853;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #2d8e47;
+        }
+
+        .btn-phonpe {
+            background: #5f259f;
+        }
+
+        .btn-phonpe:hover {
+            background: #4a1f7a;
+        }
+
+        .hint-box {
+            background: #e8f4fd;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #1565c0;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .warning-box {
+            background: #fce8e6;
+            border-left: 4px solid #d93025;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #c5221f;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
         .instruction-box {
             background: #fff8e1;
             border-left: 4px solid #fbc02d;
-            padding: 12px;
-            border-radius: 4px;
+            padding: 15px;
+            border-radius: 6px;
             font-size: 13px;
             color: #5d4037;
             margin-top: 15px;
             line-height: 1.6;
         }
-        label { 
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #555; 
-            display: block; 
-            margin-top: 10px; 
-        }
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto;
-        }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 10px; 
-            background: #fff;
-        }
-        th, td { 
-            border: 1px solid #e0e0e0; 
-            padding: 12px; 
-            text-align: left; 
-            font-size: 14px; 
-            user-select: none; 
-        }
-        th {
-            background: #f1f3f4;
-            color: #3c443b;
-        }
-        tr.history-row { cursor: pointer; transition: background 0.2s; }
-        tr.history-row:hover { background: #f8f9fa; }
-        .gst-text { 
-            font-size: 14px; 
-            color: #d93025; 
-            margin: 8px 0; 
-            font-weight: bold; 
+
+        .gst-display {
+            font-size: 16px;
+            color: #d93025;
+            font-weight: bold;
+            margin: 10px 0;
+            text-align: center;
         }
 
-        /* Custom Modal Popup Styles */
-        #custom-modal {
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        tbody td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr {
+            transition: 0.2s;
+            cursor: pointer;
+        }
+
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .status-msg {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        /* Modal */
+        .modal {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
             z-index: 9999;
             justify-content: center;
             align-items: center;
         }
+
         .modal-content {
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 10px;
-            max-width: 380px;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
         }
+
         .modal-msg {
-            font-size: 15px;
+            font-size: 16px;
             color: #333;
-            margin-bottom: 20px;
-            line-height: 1.5;
+            margin-bottom: 25px;
+            line-height: 1.6;
         }
+
         .modal-buttons {
             display: flex;
             gap: 10px;
             justify-content: center;
         }
+
         .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
             width: auto;
-            padding: 8px 20px;
-            margin: 0;
+            transition: 0.3s;
         }
-        
-        @media (min-width: 768px) {
-            .container {
-                max-width: 750px;
-                margin: 0 auto;
-                min-height: auto;
-                margin-top: 20px;
-                margin-bottom: 20px;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+
+        .modal-btn-ok {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn-ok:hover {
+            background: #5568d3;
+        }
+
+        .modal-btn-cancel {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #c82333;
+        }
+
+        .call-status {
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-wrap: wrap;
+                padding: 15px;
+            }
+
+            .login-card {
+                padding: 30px 20px;
+            }
+
+            .login-card h1 {
+                font-size: 24px;
+            }
+
+            .balance-display .amount {
+                font-size: 28px;
             }
         }
     </style>
 </head>
 <body>
 
-    <!-- Custom Modal Popup -->
-    <div id="custom-modal">
+    <!-- Navbar -->
+    <div class="navbar" id="navbar" style="display: none;">
+        <div class="navbar-brand">
+            <i class="fas fa-phone-slash"></i>
+            Anonymous Call
+        </div>
+        <div class="navbar-user" id="navbar-user" style="display: none;">
+            <span id="navbar-username" style="color: #333; font-weight: bold;"></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="custom-modal" class="modal">
         <div class="modal-content">
-            <div id="modal-msg" class="modal-msg">Message here</div>
+            <div id="modal-msg" class="modal-msg"></div>
             <div class="modal-buttons">
-                <button id="modal-ok-btn" onclick="closeModal(true)">OK</button>
-                <button id="modal-cancel-btn" onclick="closeModal(false)" style="background: #dc3545; display:none;">Cancel</button>
+                <button id="modal-ok-btn" class="modal-btn-ok" onclick="closeModal(true)">OK</button>
+                <button id="modal-cancel-btn" class="modal-btn-cancel" onclick="closeModal(false)" style="display: none;">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div class="container" id="app">
-        <header class="app-header">
-            <h2>Anonymous Call</h2>
-            <div id="header-right" style="display:none;">
-                <button onclick="logout()" style="width: auto; background: #dc3545; padding: 8px 16px; font-size: 13px; margin: 0;">Logout</button>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Login Section -->
+        <div id="login-section">
+            <div class="login-card">
+                <div style="margin-bottom: 30px;">
+                    <i class="fas fa-phone-slash" style="font-size: 48px; color: #667eea;"></i>
+                </div>
+                <h1>Anonymous Call</h1>
+                <p>Private calling platform with masked caller ID</p>
+                <p style="font-size: 18px; color: #667eea; font-weight: bold;">₹1.50/minute</p>
+                <button class="google-login-btn" onclick="loginWithGoogle()">
+                    <i class="fab fa-google"></i> Sign in with Google
+                </button>
             </div>
-        </header>
-        
-        <div id="login-section" class="section" style="text-align: center; padding: 40px 20px;">
-            <h3>Welcome! Please Login to Continue</h3>
-            <p style="color: #666; margin-bottom: 20px;">Secure, masked calling with instant UPI recharge.</p>
-            <button onclick="loginWithGoogle()" style="background: #db4437; max-width: 300px;">Sign in with Google</button>
         </div>
 
-        <div id="dashboard-section" style="display:none;">
-            <!-- User Status Bar -->
-            <div class="section" style="display: flex; justify-content: space-between; align-items: center; background: #e8f4fd;">
-                <div>
-                    <h3 id="welcome-msg" style="margin: 0; border: none; padding: 0; color: #0b57d0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 15px;"><strong>Balance:</strong> ₹<span id="minutes-count" style="color: #137333; font-weight: bold;">0.00</span> <span style="font-size: 12px; color: #5f6368;">(Wallet Balance)</span></p>
+        <!-- Dashboard Section -->
+        <div id="dashboard-section">
+            <!-- Balance Card -->
+            <div class="card">
+                <h2><i class="fas fa-wallet"></i> Your Balance</h2>
+                <div class="balance-display">
+                    <div class="label">Current Balance</div>
+                    <div class="amount">₹<span id="balance-amount">0.00</span></div>
                 </div>
+                <p style="text-align: center; color: #666; font-size: 13px; margin-top: 10px;">
+                    Rate: ₹1.50 per minute (60-second pulse)
+                </p>
             </div>
 
-            <!-- Direct PhonePe Recharge Section -->
-            <div class="section">
-                <h3>Recharge via PhonePe</h3>
-                <div id="pool-warning" class="hint-box" style="background: #fce8e6; border-left-color: #d93025; color: #c5221f; display:none;">
-                    <strong>⚠️ Recharge Temporarily Unavailable:</strong> Server pool balance is currently exhausted or insufficient. Recharge has been disabled to protect your payments.
+            <!-- Recharge Card -->
+            <div class="card">
+                <h2><i class="fas fa-credit-card"></i> Recharge Wallet</h2>
+                <div id="pool-warning" class="warning-box" style="display: none;">
+                    <strong>⚠️ Recharge Unavailable:</strong> Server pool is exhausted. Please try again later.
                 </div>
-                <div class="hint-box" id="recharge-instructions">
-                    <strong>📱 Quick Recharge Steps:</strong><br>
-                    1. Enter your amount (Min ₹1.50).<br>
-                    2. Click <b>"Pay via PhonePe"</b> to pay directly to UPI: <b>8423609308@ybl</b><br>
-                    3. After successful payment, click <b>"I Have Paid - Add Balance"</b> to get your balance instantly!
+                <div class="hint-box">
+                    <strong>📱 How to Recharge:</strong><br>
+                    1. Enter amount (min ₹1.50)<br>
+                    2. Click "Pay via PhonePe"<br>
+                    3. Complete payment to: 8423609308@ybl<br>
+                    4. Click "Confirm & Add Balance"
                 </div>
-                <input type="number" id="recharge-amount" placeholder="Enter amount in ₹ (Min ₹1.50)" min="1.5" oninput="calculateGst()">
-                <div id="gst-display" class="gst-text">Total to Pay: ₹0.00</div>
-                
-                <button id="pay-btn" onclick="payViaPhonePe()" style="background: #5f259f;">Pay via PhonePe</button>
-                <button id="add-min-btn" onclick="confirmAndAddMinutes()" style="background: #34a853; margin-top: 5px;">I Have Paid - Add Balance</button>
+
+                <div class="form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="recharge-amount" placeholder="Enter amount" min="1.50" step="0.50" oninput="calculateGst()">
+                </div>
+
+                <div class="gst-display" id="gst-display">Total: ₹0.00</div>
+
+                <button id="pay-btn" class="btn btn-phonpe" onclick="payViaPhonePe()">
+                    <i class="fas fa-mobile-alt"></i> Pay via PhonePe
+                </button>
+                <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px;">
+                    <i class="fas fa-check"></i> Confirm & Add Balance
+                </button>
             </div>
 
-            <!-- Call Section -->
-            <div class="section">
-                <h3>Make an Anonymous Call</h3>
-                <label>1. Your Mobile Number (Party A):</label>
-                <input type="text" id="user-phone" placeholder="Enter your 10-digit number" maxlength="10">
-                
-                <label>2. Target Mobile Number (Party B):</label>
-                <input type="text" id="phone-number" placeholder="Enter target 10-digit number" maxlength="10">
+            <!-- Make Call Card -->
+            <div class="card">
+                <h2><i class="fas fa-phone"></i> Make Anonymous Call</h2>
 
-                <label>3. Select Call Duration Limit:</label>
-                <select id="max-duration">
-                    <option value="1">1 Minute (Auto-cuts after 1 min)</option>
-                    <option value="2">2 Minutes (Auto-cuts after 2 mins)</option>
-                    <option value="3">3 Minutes (Auto-cuts after 3 mins)</option>
-                    <option value="5">5 Minutes (Auto-cuts after 5 mins)</option>
-                    <option value="unlimited">Unlimited (Talk until balance ends)</option>
-                </select>
-                
-                <button onclick="makeCall()" style="background: #137333; margin-top: 15px;">Call Now</button>
-                <p id="call-status" style="font-weight: bold; color: #555; margin-top: 10px; text-align: center;"></p>
+                <div class="form-group">
+                    <label>Your Phone Number</label>
+                    <input type="text" id="user-phone" placeholder="10-digit number" maxlength="10" inputmode="numeric">
+                </div>
 
-                <!-- Call Instructions Box -->
+                <div class="form-group">
+                    <label>Target Phone Number</label>
+                    <input type="text" id="phone-number" placeholder="10-digit number" maxlength="10" inputmode="numeric">
+                </div>
+
+                <div class="form-group">
+                    <label>Call Duration Limit</label>
+                    <select id="max-duration">
+                        <option value="1">1 Minute</option>
+                        <option value="2">2 Minutes</option>
+                        <option value="3">3 Minutes</option>
+                        <option value="5">5 Minutes</option>
+                        <option value="unlimited">Unlimited</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="makeCall()" style="background: #34a853;">
+                    <i class="fas fa-phone"></i> Call Now
+                </button>
+
+                <div id="call-status" class="call-status" style="display: none;"></div>
+
                 <div class="instruction-box">
-                    <strong>📌 Call Kaise Lagegi (Instructions):</strong><br>
-                    1. Jab aap <b>"Call Now"</b> par click karenge, toh sabse pehle <b>aapke phone par</b> ek incoming call aayegi.<br>
-                    2. Jaise hi aap apna phone uthayenge (receive karenge), system turant us call ko target ke number se connect kar dega.<br>
-                    3. Target wale ki screen par aapka asli number nahi dikhega, balki ek virtual/masked random number show hoga.<br>
-                    4. Selected time (duration) poora hote hi call apne aap cut ho jayegi.
+                    <strong>📞 How it works:</strong><br>
+                    1. You'll get an incoming call first<br>
+                    2. Pick up and you'll be connected<br>
+                    3. Recipient won't see your real number<br>
+                    4. Call auto-cuts when time expires
                 </div>
             </div>
 
-            <!-- History Section with Tap & Hold Delete -->
-            <div class="section">
-                <h3>Call History <span style="font-size: 12px; color: #666; font-weight: normal;">(Tap & Hold any row to delete)</span></h3>
+            <!-- Call History Card -->
+            <div class="card">
+                <h2><i class="fas fa-history"></i> Call History</h2>
+                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                    (Long press on a row to delete)
+                </p>
+
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -279,7 +598,14 @@
                                 <th>Date</th>
                             </tr>
                         </thead>
-                        <tbody id="history-table"></tbody>
+                        <tbody id="history-table">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #999; padding: 30px;">
+                                    <i class="fas fa-inbox" style="font-size: 32px; opacity: 0.5;"></i><br>
+                                    No call history yet
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -287,24 +613,34 @@
     </div>
 
     <script>
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
             authDomain: "anonymous-calling-app-e14de.firebaseapp.com",
             projectId: "anonymous-calling-app-e14de",
             storageBucket: "anonymous-calling-app-e14de.firebasestorage.app",
             messagingSenderId: "1071006820065",
-            appId: "1:1071006820065:web:4a6895517fcd06e0d939a0",
-            measurementId: "G-M3DY3474C4"
+            appId: "1:1071006820065:web:4a6895517fcd06e0d939a0"
         };
         firebase.initializeApp(firebaseConfig);
 
-        let userId = localStorage.getItem('userId');
-        if (userId) loadDashboard();
+        // Global Variables
+        let userId = null;
+        let userToken = null;
         let calculatedTotal = 0;
         let currentAvailablePool = 0;
         let modalCallback = null;
 
-        // Custom Modal Functions
+        // Check if already logged in
+        window.addEventListener('load', () => {
+            userId = localStorage.getItem('userId');
+            userToken = localStorage.getItem('userToken');
+            if (userId && userToken) {
+                loadDashboard();
+            }
+        });
+
+        // Modal Functions
         function showAlert(message) {
             document.getElementById('modal-msg').innerText = message;
             document.getElementById('modal-cancel-btn').style.display = 'none';
@@ -326,216 +662,259 @@
             }
         }
 
+        // Login with Google
         async function loginWithGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
             try {
+                const provider = new firebase.auth.GoogleAuthProvider();
                 const result = await firebase.auth().signInWithPopup(provider);
                 const user = result.user;
-                const res = await fetch('/auth/google-login', {
+
+                const response = await fetch('/auth/google-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: user.email, name: user.displayName, googleId: user.uid, termsAccepted: true })
+                    body: JSON.stringify({
+                        email: user.email,
+                        name: user.displayName,
+                        googleId: user.uid,
+                        termsAccepted: true
+                    })
                 });
-                const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('userId', data.user._id);
-                    userId = data.user._id;
+
+                const data = await response.json();
+                if (data.success && data.token) {
+                    localStorage.setItem('userId', data.user.userId);
+                    localStorage.setItem('userToken', data.token);
+                    userId = data.user.userId;
+                    userToken = data.token;
                     loadDashboard();
+                } else {
+                    showAlert('Login failed: ' + (data.error || 'Unknown error'));
                 }
-            } catch (error) { showAlert('Login failed: ' + error.message); }
+            } catch (error) {
+                showAlert('Login failed: ' + error.message);
+            }
         }
 
+        // Load Dashboard
         async function loadDashboard() {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
-            document.getElementById('header-right').style.display = 'block';
+            document.getElementById('navbar').style.display = 'flex';
+            document.getElementById('navbar-user').style.display = 'flex';
+
             try {
-                const res = await fetch(`/api/balance/${userId}`);
-                const data = await res.json();
-                if (res.ok) {
-                    document.getElementById('welcome-msg').innerText = `Hello, ${data.name || 'User'}`;
-                    const balanceVal = (data && data.balance !== undefined) ? Number(data.balance) : 0;
-                    document.getElementById('minutes-count').innerText = balanceVal.toFixed(2);
+                const response = await fetch(`/api/balance/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${userToken}` }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('navbar-username').innerText = data.name || 'User';
+                    const balance = Number(data.balance || 0);
+                    document.getElementById('balance-amount').innerText = balance.toFixed(2);
                     loadHistory();
                     checkPoolStatus();
-                } else { logout(); }
-            } catch (err) { console.error(err); }
+                } else {
+                    logout();
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
         }
 
+        // Check Pool Status
         async function checkPoolStatus() {
             try {
-                const res = await fetch('/api/pool-status');
-                const data = await res.json();
+                const response = await fetch('/api/pool-status');
+                const data = await response.json();
                 currentAvailablePool = data.availablePoolRupees || 0;
 
                 const payBtn = document.getElementById('pay-btn');
                 const addMinBtn = document.getElementById('add-min-btn');
-                const poolWarning = document.getElementById('pool-warning');
                 const rechargeInput = document.getElementById('recharge-amount');
+                const poolWarning = document.getElementById('pool-warning');
 
                 if (currentAvailablePool <= 0) {
                     payBtn.disabled = true;
                     addMinBtn.disabled = true;
                     rechargeInput.disabled = true;
                     poolWarning.style.display = 'block';
-                    poolWarning.innerHTML = `<strong>⚠️ Recharge Temporarily Unavailable:</strong> Server available pool balance is ₹${currentAvailablePool}. Recharge is disabled to protect your payment.`;
+                    poolWarning.innerHTML = `<strong>⚠️ Pool Empty:</strong> Available: ₹${currentAvailablePool.toFixed(2)}`;
                 } else {
                     payBtn.disabled = false;
-                    addMinBtn.disabled = false;
                     rechargeInput.disabled = false;
                     poolWarning.style.display = 'none';
                 }
-            } catch (err) {
-                console.error('Failed to check pool status', err);
+            } catch (error) {
+                console.error('Pool status error:', error);
             }
         }
 
+        // Calculate Amount
         function calculateGst() {
-            const baseAmount = Number(document.getElementById('recharge-amount').value);
-            const payBtn = document.getElementById('pay-btn');
-            const addMinBtn = document.getElementById('add-min-btn');
-
-            if (!baseAmount || baseAmount <= 0) {
-                calculatedTotal = 0;
-                document.getElementById('gst-display').innerText = 'Total to Pay: ₹0.00';
-                return;
-            }
-
+            const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
             calculatedTotal = baseAmount;
 
+            if (baseAmount <= 0) {
+                document.getElementById('gst-display').innerText = 'Total: ₹0.00';
+                return;
+            }
+
             if (baseAmount > currentAvailablePool) {
-                document.getElementById('gst-display').innerHTML = `<span style="color:red;">⚠️ You want ₹${baseAmount}, but only ₹${currentAvailablePool} available in pool!</span>`;
-                payBtn.disabled = true;
-                addMinBtn.disabled = true;
+                document.getElementById('gst-display').innerHTML = `<span style="color: red;">⚠️ Only ₹${currentAvailablePool.toFixed(2)} available!</span>`;
+                document.getElementById('add-min-btn').disabled = true;
             } else {
-                document.getElementById('gst-display').innerText = `Total to Pay: ₹${calculatedTotal.toFixed(2)}`;
-                if (currentAvailablePool > 0) {
-                    payBtn.disabled = false;
-                    addMinBtn.disabled = false;
-                }
+                document.getElementById('gst-display').innerText = `Total: ₹${calculatedTotal.toFixed(2)}`;
+                document.getElementById('add-min-btn').disabled = false;
             }
         }
 
+        // Pay via PhonePe
         function payViaPhonePe() {
-            const baseAmount = Number(document.getElementById('recharge-amount').value);
-            if (!baseAmount || baseAmount < 1.50) {
-                showAlert('Please enter a valid amount (min ₹1.50).');
+            const amount = Number(document.getElementById('recharge-amount').value) || 0;
+            if (amount < 1.50) {
+                showAlert('Minimum amount is ₹1.50');
                 return;
             }
-            const upiId = "8423609308@ybl";
-            const payeeName = "Anonymous Call";
-            const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${calculatedTotal.toFixed(2)}&cu=INR`;
+            const upiUrl = `upi://pay?pa=8423609308@ybl&pn=AnonymousCall&am=${amount.toFixed(2)}&cu=INR`;
             window.location.href = upiUrl;
         }
 
+        // Add Balance
         async function confirmAndAddMinutes() {
-            const baseAmount = Number(document.getElementById('recharge-amount').value);
-            if (!baseAmount || baseAmount < 1.50) {
-                showAlert('Please enter the recharge amount first.');
+            const amount = Number(document.getElementById('recharge-amount').value) || 0;
+            if (amount < 1.50) {
+                showAlert('Enter valid amount (min ₹1.50)');
                 return;
             }
 
-            showConfirm(`Kya aapne ₹${calculatedTotal.toFixed(2)} ka payment successfully kar diya hai?`, async (confirmed) => {
+            showConfirm(`Confirm adding ₹${amount.toFixed(2)} to balance?`, async (confirmed) => {
                 if (!confirmed) return;
 
                 try {
-                    const res = await fetch('/api/add-recharge', {
+                    const response = await fetch('/api/add-recharge', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId, baseAmount })
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${userToken}`
+                        },
+                        body: JSON.stringify({ userId, baseAmount: amount })
                     });
-                    const data = await res.json();
-                    if (res.ok) {
-                        showAlert(data.message);
-                        const newBal = (data && data.newBalance !== undefined) ? Number(data.newBalance) : 0;
-                        document.getElementById('minutes-count').innerText = newBal.toFixed(2);
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        showAlert('✅ Balance added successfully!');
+                        const newBalance = Number(data.newBalance || 0);
+                        document.getElementById('balance-amount').innerText = newBalance.toFixed(2);
                         document.getElementById('recharge-amount').value = '';
-                        document.getElementById('gst-display').innerText = 'Total to Pay: ₹0.00';
+                        document.getElementById('gst-display').innerText = 'Total: ₹0.00';
                         checkPoolStatus();
                     } else {
-                        showAlert(data.error);
+                        showAlert('❌ ' + (data.error || 'Error adding balance'));
                     }
-                } catch (err) {
-                    showAlert('Error adding balance.');
+                } catch (error) {
+                    showAlert('Error: ' + error.message);
                 }
             });
         }
 
+        // Make Call
         async function makeCall() {
             const userPhone = document.getElementById('user-phone').value.trim();
-            const phoneNumber = document.getElementById('phone-number').value.trim();
+            const targetPhone = document.getElementById('phone-number').value.trim();
             const maxDuration = document.getElementById('max-duration').value;
             const statusEl = document.getElementById('call-status');
 
-            if (userPhone.length !== 10 || phoneNumber.length !== 10) {
-                showAlert('Please enter valid 10-digit numbers.');
+            if (userPhone.length !== 10 || targetPhone.length !== 10) {
+                showAlert('Please enter valid 10-digit numbers');
                 return;
             }
 
-            statusEl.innerText = "Calling your phone first...";
-            statusEl.style.color = "#1a73e8";
+            statusEl.style.display = 'block';
+            statusEl.className = 'call-status status-info';
+            statusEl.innerText = '📞 Initiating call...';
 
             try {
-                const res = await fetch('/api/call', {
+                const response = await fetch('/api/call', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, phoneNumber, maxDuration })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        phoneNumber: targetPhone,
+                        maxDuration
+                    })
                 });
-                const data = await res.json();
-                if (res.ok) {
-                    const callCost = (data && data.cost !== undefined) ? Number(data.cost) : 0;
-                    const remBal = (data && data.remainingBalance !== undefined) ? Number(data.remainingBalance) : 0;
+
+                const data = await response.json();
+                if (response.ok) {
+                    const cost = Number(data.cost || 0);
+                    const duration = data.durationMinutes || 1;
+                    const remainingBalance = Number(data.remainingBalance || 0);
+
+                    statusEl.className = 'call-status status-success';
+                    statusEl.innerText = `✅ Call completed! Duration: ${duration} min | Cost: ₹${cost.toFixed(2)}`;
+                    document.getElementById('balance-amount').innerText = remainingBalance.toFixed(2);
                     
-                    statusEl.innerText = `Call completed! Duration: ${data.durationMinutes || 1} min, Cost: ₹${callCost.toFixed(2)}`;
-                    statusEl.style.color = "#137333";
-                    document.getElementById('minutes-count').innerText = remBal.toFixed(2);
-                    loadHistory();
+                    setTimeout(() => {
+                        loadHistory();
+                        statusEl.style.display = 'none';
+                    }, 2000);
                 } else {
-                    statusEl.innerText = data.error;
-                    statusEl.style.color = "#d93025";
+                    statusEl.className = 'call-status status-error';
+                    statusEl.innerText = '❌ ' + (data.error || 'Call failed');
                 }
-            } catch (err) {
-                statusEl.innerText = "Network error connecting call.";
-                statusEl.style.color = "#d93025";
+            } catch (error) {
+                statusEl.className = 'call-status status-error';
+                statusEl.innerText = '❌ Error: ' + error.message;
             }
         }
 
+        // Load History
         async function loadHistory() {
             try {
-                const res = await fetch(`/api/history/${userId}`);
-                const history = await res.json();
+                const response = await fetch(`/api/history/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${userToken}` }
+                });
+
+                const history = await response.json();
                 const tbody = document.getElementById('history-table');
                 tbody.innerHTML = '';
+
                 if (!Array.isArray(history) || history.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #666;">No call history available.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #999; padding: 30px;">
+                        <i class="fas fa-inbox" style="font-size: 32px; opacity: 0.5;"></i><br>
+                        No call history yet
+                    </td></tr>`;
                     return;
                 }
+
                 history.forEach(item => {
                     const tr = document.createElement('tr');
-                    tr.className = 'history-row';
-                    
-                    const itemCost = (item && item.cost !== undefined) ? Number(item.cost) : 0;
-                    const targetPh = item.targetPhone || 'N/A';
-                    const durationMins = item.durationMinutes || 1;
-                    const callDate = item.date ? new Date(item.date).toLocaleDateString() : '';
+                    const targetPhone = item.targetPhone || 'N/A';
+                    const duration = item.durationMinutes || 1;
+                    const cost = Number(item.cost || 0);
+                    const date = item.date ? new Date(item.date).toLocaleDateString() : '';
 
                     tr.innerHTML = `
-                        <td>${targetPh}</td>
-                        <td>${durationMins} min</td>
-                        <td>₹${itemCost.toFixed(2)}</td>
-                        <td>${callDate}</td>
+                        <td><strong>${targetPhone}</strong></td>
+                        <td>${duration} min</td>
+                        <td>₹${cost.toFixed(2)}</td>
+                        <td>${date}</td>
                     `;
 
                     let pressTimer;
                     const startPress = () => {
                         pressTimer = setTimeout(() => {
-                            showConfirm(`Kya aap ${targetPh} ki is history ko delete karna chahte hain?`, async (confirmed) => {
+                            showConfirm(`Delete this call record?`, async (confirmed) => {
                                 if (confirmed) await deleteHistory(item._id);
                             });
                         }, 600);
                     };
 
-                    const cancelPress = () => { clearTimeout(pressTimer); };
+                    const cancelPress = () => clearTimeout(pressTimer);
 
                     tr.addEventListener('mousedown', startPress);
                     tr.addEventListener('mouseup', cancelPress);
@@ -545,26 +924,35 @@
 
                     tbody.appendChild(tr);
                 });
-            } catch (err) { console.error(err); }
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
         }
 
+        // Delete History
         async function deleteHistory(historyId) {
             try {
-                const res = await fetch(`/api/history/${historyId}`, { method: 'DELETE' });
-                if (res.ok) {
+                const response = await fetch(`/api/history/${historyId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${userToken}` }
+                });
+
+                if (response.ok) {
                     loadHistory();
                 } else {
                     showAlert('Failed to delete history');
                 }
-            } catch (err) {
-                showAlert('Error deleting history');
+            } catch (error) {
+                showAlert('Error: ' + error.message);
             }
         }
 
+        // Logout
         async function logout() {
             await firebase.auth().signOut();
             localStorage.removeItem('userId');
-            window.location.reload();
+            localStorage.removeItem('userToken');
+            location.reload();
         }
     </script>
 </body>
