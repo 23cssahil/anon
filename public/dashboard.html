@@ -536,13 +536,16 @@ function openPhonePeApp() {
     const amountInput = document.getElementById('recharge-amount').value;
     const amount = Number(amountInput);
 
-    if (!amount || amount < 3) {
+    if (!amount || amount < z) {
         alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
         return;
     }
 
-    const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-    window.location.href = upiPayUrl;
+    // PhonePe ka direct intent link jo seedha PhonePe ko target karega
+    const phonePeUrl = `phonepe://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+    
+    // Fallback agar PhonePe install na ho toh standard UPI
+    window.location.href = phonePeUrl;
 }
 </script>
 
