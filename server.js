@@ -1,28 +1,132 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-app.set('trust proxy', true); 
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.static('public'));
 
-mongoose.connect(process.env.MONGO_URI).then(async () => {
+// ============== RATE LIMITING ==============
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Bahut saare login attempts. Kripya 15 minutes baad try karein.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const otpLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 5,
+    message: 'OTP bahut jaldi bhej diya. Kripya baad mein try karein.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const callLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 30,
+    message: 'Bahut calls lag rahe hain. Kripya baad mein try karein.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const rechargeLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    message: 'Bahut recharges ho rahe hain. Kripya baad mein try karein.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+// ============== AUTHENTICATION MIDDLEWARE ==============
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-env', (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid or expired token' });
+        }
+        req.user = user;
+        next();
+    });
+};
+
+// ============== VALIDATION FUNCTIONS ==============
+function validatePhone(phone) {
+    const phoneRegex = /^[6-9]\d{9}$/;
+    return phoneRegex.test(phone);
+}
+
+function validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return input;
+    return input.trim().replace(/[<>]/g, '');
+}
+
+function encryptSensitiveData(data) {
+    const algorithm = 'aes-256-cbc';
+    const secretKey = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-secret-key', 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, secretKey, iv);
+    let encrypted = cipher.update(data, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return iv.toString('hex') + ':' + encrypted;
+}
+
+function decryptSensitiveData(data) {
+    try {
+        const algorithm = 'aes-256-cbc';
+        const secretKey = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-secret-key', 'salt', 32);
+        const parts = data.split(':');
+        const iv = Buffer.from(parts[0], 'hex');
+        const decipher = crypto.createDecipheriv(algorithm, secretKey, iv);
+        let decrypted = decipher.update(parts[1], 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (err) {
+        console.error('Decryption error:', err);
+        return null;
+    }
+}
+
+// ============== DATABASE CONNECTION ==============
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+    console.error('MONGO_URI is not defined in .env file');
+    process.exit(1);
+}
+
+mongoose.connect(mongoUri).then(async () => {
     console.log('MongoDB Connected');
     try {
-        // 1. Migrate Call History to 60s pulse (₹1.50 per minute flat block)
+        // Migrate Call History to 60s pulse with minimum ₹1.50 billing
         const histories = await CallHistory.find({});
         for (let h of histories) {
             let actualSecs = h.durationSeconds || Math.round((h.durationMinutes || 0) * 60);
             if (actualSecs <= 0 && h.cost) {
-                // Approximate back-calculation if seconds missing
                 actualSecs = Math.round((h.cost / 1.50) * 60);
             }
+            
+            // BILLING LOGIC: Minimum 1 minute (60s pulse) = ₹1.50
             const billedMinutes = actualSecs > 0 ? Math.ceil(actualSecs / 60) : 1;
             const exactCost = Number((billedMinutes * 1.50).toFixed(2));
-            
+
             if (h.cost !== exactCost || h.durationMinutes !== billedMinutes) {
                 h.durationMinutes = billedMinutes;
                 h.durationSeconds = actualSecs;
@@ -31,66 +135,88 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
             }
         }
 
-        // 2. Migrate User balances from old minutes format to ₹ Balance if needed
+        // Migrate User balances
         const users = await User.find({});
         for (let u of users) {
             if (u.minutes !== undefined && u.minutes > 0 && u.balance === 0) {
                 u.balance = Number((u.minutes * 1.50).toFixed(2));
-                u.minutes = undefined; // clear old field
+                u.minutes = undefined;
                 await u.save();
             }
         }
-        console.log('Automatic data migration & 60s pulse cost check completed successfully.');
+        console.log('Migration completed successfully.');
     } catch (migErr) {
         console.error('Migration error:', migErr);
     }
-}).catch(err => console.log(err));
+}).catch(err => {
+    console.error('MongoDB Connection Error:', err.message);
+    process.exit(1);
+});
 
-// User Schema with Wallet Balance in Rupees (₹)
+// ============== DATABASE SCHEMAS ==============
 const userSchema = new mongoose.Schema({
-    googleId: String,
-    email: String,
-    name: String,
-    balance: { type: Number, default: 0 }, // Wallet balance in ₹
-    verifiedPhone: { type: String, default: null },
+    googleId: { type: String, required: true, unique: true, index: true },
+    email: { type: String, required: true, unique: true, index: true, validate: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+    name: { type: String, required: true },
+    balance: { type: Number, default: 0, min: 0 },
+    verifiedPhone: { type: String, default: null, select: false },
     otpCode: { type: String, default: null },
     otpExpires: { type: Date, default: null },
     termsAccepted: { type: Boolean, default: false },
     termsAcceptedAt: { type: Date, default: null },
-    signupIp: { type: String, default: null }
+    signupIp: { type: String, default: null },
+    createdAt: { type: Date, default: Date.now, index: true }
 });
+
+userSchema.index({ createdAt: -1 });
+userSchema.index({ email: 1, googleId: 1 });
+
 const User = mongoose.model('User', userSchema);
 
-// Call History Schema with Audit Trail
 const callSchema = new mongoose.Schema({
-    userId: mongoose.Schema.Types.ObjectId,
-    callerPhone: String,      // Party A
-    targetPhone: String,      // Party B
-    durationMinutes: Number,  // Billed minutes (60s pulse blocks)
-    durationSeconds: Number,  // Actual talk seconds
-    cost: Number,             // Cost in ₹ (₹1.50 per pulse)
-    clientIp: String,         
-    userAgent: String,        
-    date: { type: Date, default: Date.now }
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+    callerPhone: { type: String, required: true },
+    targetPhone: { type: String, required: true },
+    durationMinutes: { type: Number, required: true, min: 1 },
+    durationSeconds: { type: Number, required: true, min: 0 },
+    cost: { type: Number, required: true, min: 1.50 }, // Minimum ₹1.50 per call
+    clientIp: String,
+    userAgent: String,
+    date: { type: Date, default: Date.now, index: true }
 });
+
+callSchema.index({ userId: 1, date: -1 });
+callSchema.index({ date: -1 });
+callSchema.index({ userId: 1, createdAt: -1 });
+
 const CallHistory = mongoose.model('CallHistory', callSchema);
 
+// ============== POOL STATUS ==============
 async function getEdesyBalance() {
     try {
+        const apiKey = process.env.EDESY_API_KEY;
+        if (!apiKey) {
+            console.warn('EDESY_API_KEY not configured');
+            return 0;
+        }
+
         const response = await fetch('https://voice-api.edesy.in/v1/balance', {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            timeout: 5000
         });
+
         const data = await response.json();
         if (response.ok) {
             return Number(data.minutes || data.balance || 0);
         }
+        console.warn('Edesy balance fetch failed:', data);
         return 0;
     } catch (err) {
-        console.error('Error fetching Edesy balance:', err);
+        console.error('Error fetching Edesy balance:', err.message);
         return 0;
     }
 }
@@ -98,11 +224,11 @@ async function getEdesyBalance() {
 async function getTotalAssignedPoolRupees() {
     try {
         const result = await User.aggregate([
-            { $group: { _id: null, totalBalance: { $sum: "$balance" } } }
+            { $group: { _id: null, totalBalance: { $sum: '$balance' } } }
         ]);
         return result.length > 0 ? Number(result[0].totalBalance) : 0;
     } catch (err) {
-        console.error('Error calculating assigned pool:', err);
+        console.error('Error calculating assigned pool:', err.message);
         return 0;
     }
 }
@@ -115,28 +241,40 @@ app.get('/api/pool-status', async (req, res) => {
         const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
         res.json({ edesyTotalRupees, assignedRupees, availablePoolRupees });
     } catch (err) {
+        console.error('Pool status error:', err.message);
         res.status(500).json({ error: 'Failed to fetch pool status' });
     }
 });
 
-// Google Login with Terms Acceptance & IP Logging
-app.post('/auth/google-login', async (req, res) => {
+// ============== AUTHENTICATION ==============
+app.post('/auth/google-login', loginLimiter, async (req, res) => {
     try {
         const { email, name, googleId, termsAccepted } = req.body;
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+        if (!email || !validateEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        if (!name || name.length < 2) {
+            return res.status(400).json({ error: 'Name must be at least 2 characters' });
+        }
+        if (!googleId) {
+            return res.status(400).json({ error: 'Google ID is required' });
+        }
+
+        const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
         let user = await User.findOne({ googleId });
-        
+
         if (!user) {
             if (!termsAccepted) {
-                return res.status(400).json({ error: 'You must accept the Terms of Service and Privacy Policy to register.' });
+                return res.status(400).json({ error: 'Aapko Terms of Service and Privacy Policy accept karni hongi.' });
             }
 
-            user = new User({ 
-                email, 
-                name, 
-                googleId, 
-                balance: 0, 
+            user = new User({
+                email: sanitizeInput(email),
+                name: sanitizeInput(name),
+                googleId: sanitizeInput(googleId),
+                balance: 0,
                 termsAccepted: true,
                 termsAcceptedAt: new Date(),
                 signupIp: clientIp
@@ -150,76 +288,129 @@ app.post('/auth/google-login', async (req, res) => {
                 await user.save();
             }
         }
-        res.json({ success: true, user });
+
+        const token = jwt.sign(
+            { userId: user._id, email: user.email },
+            process.env.JWT_SECRET || 'your-secret-key-change-in-env',
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            success: true,
+            token,
+            user: {
+                userId: user._id,
+                name: user.name,
+                email: user.email,
+                balance: user.balance,
+                termsAccepted: user.termsAccepted
+            }
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Login error:', error.message);
+        res.status(500).json({ error: 'Server error during login' });
     }
 });
 
-app.get('/api/balance/:userId', async (req, res) => {
+// ============== BALANCE ==============
+app.get('/api/balance/:userId', authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
+        if (req.user.userId !== req.params.userId && !req.user.isAdmin) {
+            return res.status(403).json({ error: 'Unauthorized access' });
+        }
+
+        const user = await User.findById(req.params.userId).select('-verifiedPhone');
         if (!user) return res.status(404).json({ error: 'User not found' });
-        res.json({ 
-            balance: user.balance, // Returns wallet balance in ₹
-            name: user.name, 
-            verifiedPhone: user.verifiedPhone || '',
-            termsAccepted: user.termsAccepted 
+
+        res.json({
+            balance: user.balance,
+            name: user.name,
+            termsAccepted: user.termsAccepted
         });
     } catch (error) {
+        console.error('Balance fetch error:', error.message);
         res.status(500).json({ error: 'Error fetching balance' });
     }
 });
 
-app.post('/api/send-otp', async (req, res) => {
-    const { userId, phoneNumber } = req.body;
+// ============== OTP ==============
+app.post('/api/send-otp', authenticateToken, otpLimiter, async (req, res) => {
     try {
-        if (!phoneNumber || phoneNumber.length !== 10) {
-            return res.status(400).json({ error: 'Kripya sahi 10-digit mobile number enter karein.' });
+        const { phoneNumber } = req.body;
+        const userId = req.user.userId;
+
+        if (!phoneNumber || !validatePhone(phoneNumber)) {
+            return res.status(400).json({ error: 'Kripya sahi 10-digit Indian mobile number enter karein.' });
         }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
         user.otpCode = otp;
-        user.otpExpires = Date.now() + 5 * 60 * 1000;
+        user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
         await user.save();
 
-        console.log(`[SECURITY OTP] Number: ${phoneNumber} ke liye OTP hai: ${otp}`);
-        res.json({ success: true, message: `OTP successfully bhej diya gaya hai. (Test OTP for dev: ${otp})` });
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV OTP] Phone: ${phoneNumber} | OTP: ${otp}`);
+            return res.json({
+                success: true,
+                message: 'OTP bhej diya gaya hai.',
+                devOtp: otp
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'OTP aapke number par send ho gaya hai.'
+        });
     } catch (err) {
+        console.error('Send OTP error:', err.message);
         res.status(500).json({ error: 'OTP bhejne mein error aayi.' });
     }
 });
 
-app.post('/api/verify-otp', async (req, res) => {
-    const { userId, phoneNumber, otp } = req.body;
+app.post('/api/verify-otp', authenticateToken, async (req, res) => {
     try {
+        const { phoneNumber, otp } = req.body;
+        const userId = req.user.userId;
+
+        if (!phoneNumber || !validatePhone(phoneNumber)) {
+            return res.status(400).json({ error: 'Invalid phone number format' });
+        }
+
+        if (!otp || otp.length !== 6 || isNaN(otp)) {
+            return res.status(400).json({ error: 'OTP must be 6 digits' });
+        }
+
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        if (!user.otpCode || user.otpCode !== otp || Date.now() > user.otpExpires) {
+        if (!user.otpCode || user.otpCode !== otp || new Date() > user.otpExpires) {
             return res.status(400).json({ error: 'Galat ya expired OTP! Kripya dobara try karein.' });
         }
 
-        user.verifiedPhone = phoneNumber;
+        user.verifiedPhone = encryptSensitiveData(phoneNumber);
         user.otpCode = null;
         user.otpExpires = null;
         await user.save();
 
-        res.json({ success: true, message: 'Number successfully verify ho gaya hai!' });
+        res.json({ success: true, message: 'Mobile number successfully verify ho gaya!' });
     } catch (err) {
+        console.error('Verify OTP error:', err.message);
         res.status(500).json({ error: 'OTP verification mein error aayi.' });
     }
 });
 
-app.post('/api/add-recharge', async (req, res) => {
-    const { userId, baseAmount } = req.body;
+// ============== RECHARGE ==============
+app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, res) => {
     try {
+        const { baseAmount } = req.body;
+        const userId = req.user.userId;
+
         const amount = Number(baseAmount);
-        if (!amount || amount < 1.50) {
-            return res.status(400).json({ error: 'Minimum recharge amount is ₹1.50.' });
+        if (!amount || amount < 1.50 || amount > 10000) {
+            return res.status(400).json({ error: 'Recharge amount ₹1.50 to ₹10,000 ke beech hona chahiye.' });
         }
 
         const edesyTotalMins = await getEdesyBalance();
@@ -228,68 +419,93 @@ app.post('/api/add-recharge', async (req, res) => {
         const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
 
         if (amount > availablePoolRupees) {
-            return res.status(400).json({ 
-                error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}` 
+            return res.status(400).json({
+                error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}`
             });
         }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        user.balance = Number((user.balance + amount).toFixed(2));
-        await user.save();
+        if (process.env.NODE_ENV !== 'production') {
+            user.balance = Number((user.balance + amount).toFixed(2));
+            await user.save();
 
-        res.json({ 
-            success: true, 
-            message: `Payment confirmed! ₹${amount} added successfully.`,
-            newBalance: user.balance
-        });
+            return res.json({
+                success: true,
+                message: `[DEV MODE] ₹${amount} added successfully.`,
+                newBalance: user.balance
+            });
+        }
+
+        res.status(503).json({ error: 'Payment gateway integration pending. Contact admin.' });
     } catch (error) {
-        res.status(500).json({ error: 'Error adding recharge amount' });
+        console.error('Recharge error:', error.message);
+        res.status(500).json({ error: 'Error processing recharge' });
     }
 });
 
-// Call API with 60-Second Pulse Logic (₹1.50 per block)
-app.post('/api/call', async (req, res) => {
-    const { userId, phoneNumber, maxDuration, actualDurationSeconds } = req.body;
-    
+// ============== CALL API ==============
+app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
     try {
-        const user = await User.findById(userId);
+        const { phoneNumber, maxDuration, actualDurationSeconds } = req.body;
+        const userId = req.user.userId;
+
+        if (!phoneNumber || !validatePhone(phoneNumber)) {
+            return res.status(400).json({ error: 'Valid phone number required (10 digits)' });
+        }
+
+        let actualSecs = 0;
+        if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) {
+            actualSecs = Number(actualDurationSeconds);
+            if (isNaN(actualSecs) || actualSecs < 0 || actualSecs > 3600) {
+                return res.status(400).json({ error: 'Duration must be between 0 and 3600 seconds' });
+            }
+        }
+
+        const user = await User.findById(userId).select('+verifiedPhone');
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (!user.termsAccepted) {
-            return res.status(400).json({ error: 'Aapko pehle Terms of Service accept karni hongi.' });
+            return res.status(400).json({ error: 'Pehle Terms of Service accept karni hongi.' });
         }
 
         if (!user.verifiedPhone) {
-            return res.status(400).json({ error: 'Pehle aapko apna mobile number OTP se verify karna hoga tabhi call lagegi!' });
+            return res.status(400).json({ error: 'Pehle apna mobile number OTP se verify karo!' });
         }
 
-        const userPhone = user.verifiedPhone; 
-        const ratePerPulse = 1.50; // ₹1.50 per 60 seconds pulse
+        const decryptedPhone = decryptSensitiveData(user.verifiedPhone);
+        if (!decryptedPhone) {
+            return res.status(500).json({ error: 'Phone number decryption error' });
+        }
+
+        const ratePerPulse = 1.50;
 
         if (user.balance < ratePerPulse) {
-            return res.status(400).json({ error: 'Aapka wallet balance khatam ho chuka hai! Kripya recharge karein (Minimum ₹1.50 required).' });
+            return res.status(400).json({
+                error: 'Wallet balance khatam! Kripya recharge karein (Minimum ₹1.50 required).'
+            });
         }
 
-        // Max duration calculate based on wallet balance
         let maxAllowedMinutes = Math.floor(user.balance / ratePerPulse);
         if (maxAllowedMinutes < 1) maxAllowedMinutes = 1;
 
         let durationLimitMinutes = maxAllowedMinutes;
-        if (maxDuration !== 'unlimited' && maxDuration) {
+        if (maxDuration && maxDuration !== 'unlimited') {
             const requestedMins = Number(maxDuration);
-            if (requestedMins < durationLimitMinutes) {
+            if (!isNaN(requestedMins) && requestedMins > 0 && requestedMins < durationLimitMinutes) {
                 durationLimitMinutes = requestedMins;
             }
         }
 
-        if (user.balance < (durationLimitMinutes * ratePerPulse)) {
-            return res.status(400).json({ error: `Aapke paas sufficient balance nahi hai. Required: ₹${durationLimitMinutes * ratePerPulse}` });
+        if (user.balance < ratePerPulse) {
+            return res.status(400).json({
+                error: `Insufficient balance. Required: ₹${ratePerPulse.toFixed(2)}`
+            });
         }
 
         if (!process.env.EDESY_API_KEY) {
-            return res.status(500).json({ error: 'Edesy API Key is missing on server.' });
+            return res.status(500).json({ error: 'Server configuration error' });
         }
 
         const edesyResponse = await fetch('https://voice-api.edesy.in/v1/masking/calls', {
@@ -298,8 +514,8 @@ app.post('/api/call', async (req, res) => {
                 'Authorization': `Bearer ${process.env.EDESY_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                party_a: userPhone,
+            body: JSON.stringify({
+                party_a: decryptedPhone,
                 party_b: phoneNumber,
                 max_duration: durationLimitMinutes
             })
@@ -307,31 +523,30 @@ app.post('/api/call', async (req, res) => {
 
         const edesyData = await edesyResponse.json();
         if (!edesyResponse.ok) {
-            return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
+            return res.status(400).json({ error: edesyData.message || 'Call initiation failed' });
         }
 
-        // 60-Second Pulse Calculation (Minimum 1 block = ₹1.50)
-        let actualSecs = actualDurationSeconds !== undefined && actualDurationSeconds !== null ? Number(actualDurationSeconds) : 0;
-        let billedMinutes = 1; // Default minimum 1 minute pulse
+        // ========== BILLING LOGIC: FIXED 60-SECOND PULSE ==========
+        // Minimum 1 minute = ₹1.50 (even if call is 5 seconds or 59 seconds)
+        // Every call = ₹1.50 minimum
+        let billedMinutes = 1; // Minimum 1 minute
         
         if (actualSecs > 0) {
-            billedMinutes = Math.ceil(actualSecs / 60); // Round up to next minute block (60s pulse)
-        } else {
-            billedMinutes = durationLimitMinutes; // Fallback if seconds not passed
+            billedMinutes = Math.ceil(actualSecs / 60); // Round up to next minute
         }
 
         const callCost = Number((billedMinutes * ratePerPulse).toFixed(2));
 
-        // Deduct from user wallet balance securely
+        // Deduct from wallet
         user.balance = Math.max(0, Number((user.balance - callCost).toFixed(2)));
         await user.save();
 
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
         const userAgent = req.headers['user-agent'] || 'Unknown';
 
-        await CallHistory.create({ 
-            userId, 
-            callerPhone: userPhone,
+        await CallHistory.create({
+            userId,
+            callerPhone: decryptedPhone,
             targetPhone: phoneNumber,
             durationMinutes: billedMinutes,
             durationSeconds: actualSecs,
@@ -340,36 +555,65 @@ app.post('/api/call', async (req, res) => {
             userAgent
         });
 
-        res.json({ 
-            success: true, 
-            message: 'Call completed!', 
+        res.json({
+            success: true,
+            message: 'Call completed!',
             remainingBalance: user.balance,
             durationMinutes: billedMinutes,
             cost: callCost
         });
-
     } catch (error) {
-        res.status(500).json({ error: 'Server error during call.' });
+        console.error('Call error:', error.message);
+        res.status(500).json({ error: 'Server error during call' });
     }
 });
 
-app.get('/api/history/:userId', async (req, res) => {
+// ============== CALL HISTORY ==============
+app.get('/api/history/:userId', authenticateToken, async (req, res) => {
     try {
-        const history = await CallHistory.find({ userId: req.params.userId }).sort({ date: -1 });
+        if (req.user.userId !== req.params.userId && !req.user.isAdmin) {
+            return res.status(403).json({ error: 'Unauthorized access' });
+        }
+
+        const history = await CallHistory.find({ userId: req.params.userId })
+            .sort({ date: -1 })
+            .limit(100)
+            .select('-userAgent');
+
         res.json(history);
     } catch (error) {
+        console.error('History fetch error:', error.message);
         res.status(500).json({ error: 'Unable to fetch history' });
     }
 });
 
-app.delete('/api/history/:historyId', async (req, res) => {
+app.delete('/api/history/:historyId', authenticateToken, async (req, res) => {
     try {
+        const history = await CallHistory.findById(req.params.historyId);
+        if (!history) {
+            return res.status(404).json({ error: 'History record not found' });
+        }
+
+        if (req.user.userId !== history.userId.toString() && !req.user.isAdmin) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
         await CallHistory.findByIdAndDelete(req.params.historyId);
         res.json({ success: true, message: 'History deleted successfully' });
     } catch (error) {
+        console.error('History delete error:', error.message);
         res.status(500).json({ error: 'Failed to delete history' });
     }
 });
 
+// ============== ERROR HANDLING ==============
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
