@@ -417,7 +417,7 @@ app.post('/api/verify-otp', authenticateToken, async (req, res) => {
     }
 });
 
-// ============== RECHARGE ==============
+/// ============== RECHARGE ==============
 app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, res) => {
     try {
         const { baseAmount } = req.body;
@@ -428,38 +428,24 @@ app.post('/api/add-recharge', authenticateToken, rechargeLimiter, async (req, re
             return res.status(400).json({ error: `Recharge amount ₹${ACTUAL_RATE_PER_MINUTE} to ₹10,000 ke beech hona chahiye.` });
         }
 
-        const edesyTotalMins = await getEdesyBalance();
-        const edesyTotalRupees = edesyTotalMins * COMMISSION_PER_MINUTE;
-        const assignedRupees = await getTotalAssignedPoolRupees();
-        const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
-
-        // if (amount > availablePoolRupees) {
-        //     return res.status(400).json({
-        //         error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}`
-        //     });
-        // }
-
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        if (process.env.NODE_ENV !== 'production') {
-            user.balance = Number((user.balance + amount).toFixed(2));
-            await user.save();
+        // Manual UPI QR recharge ke liye direct balance update karein
+        user.balance = Number((user.balance + amount).toFixed(2));
+        await user.save();
 
-            return res.json({
-                success: true,
-                message: `[DEV MODE] ₹${amount} added successfully.`,
-                newBalance: user.balance
-            });
-        }
+        return res.json({
+            success: true,
+            message: `₹${amount} added successfully!`,
+            newBalance: user.balance
+        });
 
-        res.status(503).json({ error: 'Payment gateway integration pending. Contact admin.' });
     } catch (error) {
         console.error('Recharge error:', error.message);
         res.status(500).json({ error: 'Error processing recharge' });
     }
 });
-
 // ============== CALL API ==============
 app.post('/api/call', authenticateToken, callLimiter, async (req, res) => {
     try {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewort" content="width=device-width, initial-scale=1.0">
     <title>Anonymous Call - Private Calling Platform</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -498,33 +498,42 @@
             </div>
 
             <!-- Recharge Card -->
-            <div class="card">
-                <h2><i class="fas fa-credit-card"></i> Recharge Wallet</h2>
-                <div id="pool-warning" class="warning-box" style="display: none;">
-                    <strong>⚠️ Recharge Unavailable:</strong> Server pool is exhausted. Please try again later.
-                </div>
-                <div class="hint-box">
-                    <strong>📱 How to Recharge:</strong><br>
-                    1. Enter amount (min ₹3)<br>
-                    2. Click "Pay via PhonePe"<br>
-                    3. Complete payment to: 8423609308@ybl<br>
-                    4. Click "Confirm & Add Balance"
-                </div>
+           <div class="card">
+    <h2><i class="fas fa-credit-card"></i> Recharge Wallet</h2>
+    
+    <div id="pool-warning" class="warning-box" style="display: none;">
+        <strong>⚠️ Notice:</strong> Pool is currently low, but you can still recharge.
+    </div>
 
-                <div class="form-group">
-                    <label>Amount (₹)</label>
-                    <input type="number" id="recharge-amount" placeholder="Enter amount" min="3" step="1" oninput="calculateGst()">
-                </div>
+    <!-- QR Code & Instructions Box -->
+    <div class="hint-box" style="text-align: center;">
+        <strong>📱 How to Recharge:</strong><br>
+        1. Enter amount (min ₹3)<br>
+        2. Scan QR code below or click "Pay via PhonePe"<br>
+        3. Complete payment to UPI ID: <strong>8423609308@ybl</strong><br>
+        4. Click "Confirm & Add Balance"<br><br>
 
-                <div class="gst-display" id="gst-display">Total: ₹0.00</div>
+        <!-- PhonePe QR Code Image -->
+        <img src="/images/phonepe-qr.png" alt="PhonePe QR Code" style="width: 180px; height: 180px; margin: 10px auto; display: block; border: 1px solid #ccc; border-radius: 8px;">
+        <span style="font-size: 14px; color: #5f259f; font-weight: bold;">UPI ID: 8423609308@ybl</span>
+    </div>
 
-                <button id="pay-btn" class="btn btn-phonpe" onclick="payViaPhonePe()">
-                    <i class="fas fa-mobile-alt"></i> Pay via PhonePe
-                </button>
-                <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px;">
-                    <i class="fas fa-check"></i> Confirm & Add Balance
-                </button>
-            </div>
+    <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" id="recharge-amount" placeholder="Enter amount" min="3" step="1" oninput="calculateGst()">
+    </div>
+
+    <div class="gst-display" id="gst-display">Total: ₹0.00</div>
+
+    <!-- PhonePe Direct App Intent Button -->
+    <button id="pay-btn" class="btn btn-phonpe" onclick="payViaPhonePe()" style="background-color: #5f259f; color: white;">
+        <i class="fas fa-mobile-alt"></i> Pay via PhonePe / UPI App
+    </button>
+    
+    <button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px;">
+        <i class="fas fa-check"></i> Confirm & Add Balance
+    </button>
+</div>
 
             <!-- Make Call Card -->
             <div class="card">
