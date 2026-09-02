@@ -47,12 +47,6 @@
             font-size: 28px;
         }
 
-        .navbar-menu {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
         .navbar-user {
             display: flex;
             align-items: center;
@@ -130,14 +124,15 @@
             color: white;
         }
 
-        #dashboard-section {
-            display: none;
+        .google-login-btn:disabled {
+            background: #ccc;
+            color: #999;
+            cursor: not-allowed;
+            border-color: #999;
         }
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 25px;
+        #dashboard-section {
+            display: none;
         }
 
         .card {
@@ -146,6 +141,7 @@
             padding: 25px;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
             animation: slideUp 0.5s ease-out;
+            margin-bottom: 25px;
         }
 
         .card h2 {
@@ -380,6 +376,7 @@
             color: #333;
             margin-bottom: 25px;
             line-height: 1.6;
+            word-wrap: break-word;
         }
 
         .modal-buttons {
@@ -422,18 +419,6 @@
             border-radius: 8px;
             margin-top: 10px;
             text-align: center;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
-        }
-
-        .empty-state i {
-            font-size: 48px;
-            margin-bottom: 15px;
-            opacity: 0.5;
         }
 
         @media (max-width: 768px) {
@@ -491,8 +476,8 @@
                 </div>
                 <h1>Anonymous Call</h1>
                 <p>Private calling platform with masked caller ID</p>
-                <p style="font-size: 18px; color: #667eea; font-weight: bold;">₹1.50/minute</p>
-                <button class="google-login-btn" onclick="loginWithGoogle()">
+                <p style="font-size: 18px; color: #667eea; font-weight: bold;">₹3/minute</p>
+                <button id="login-btn" class="google-login-btn" onclick="loginWithGoogle()">
                     <i class="fab fa-google"></i> Sign in with Google
                 </button>
             </div>
@@ -508,7 +493,7 @@
                     <div class="amount">₹<span id="balance-amount">0.00</span></div>
                 </div>
                 <p style="text-align: center; color: #666; font-size: 13px; margin-top: 10px;">
-                    Rate: ₹1.50 per minute (60-second pulse)
+                    Rate: ₹3 per minute (60-second pulse)
                 </p>
             </div>
 
@@ -520,7 +505,7 @@
                 </div>
                 <div class="hint-box">
                     <strong>📱 How to Recharge:</strong><br>
-                    1. Enter amount (min ₹1.50)<br>
+                    1. Enter amount (min ₹3)<br>
                     2. Click "Pay via PhonePe"<br>
                     3. Complete payment to: 8423609308@ybl<br>
                     4. Click "Confirm & Add Balance"
@@ -528,7 +513,7 @@
 
                 <div class="form-group">
                     <label>Amount (₹)</label>
-                    <input type="number" id="recharge-amount" placeholder="Enter amount" min="1.50" step="0.50" oninput="calculateGst()">
+                    <input type="number" id="recharge-amount" placeholder="Enter amount" min="3" step="1" oninput="calculateGst()">
                 </div>
 
                 <div class="gst-display" id="gst-display">Total: ₹0.00</div>
@@ -664,6 +649,10 @@
 
         // Login with Google
         async function loginWithGoogle() {
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.disabled = true;
+            loginBtn.innerText = 'Signing in...';
+
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
                 const result = await firebase.auth().signInWithPopup(provider);
@@ -688,10 +677,15 @@
                     userToken = data.token;
                     loadDashboard();
                 } else {
-                    showAlert('Login failed: ' + (data.error || 'Unknown error'));
+                    showAlert('❌ Login Failed\n\n' + (data.error || 'Unknown error occurred'));
+                    loginBtn.disabled = false;
+                    loginBtn.innerText = '🔐 Sign in with Google';
                 }
             } catch (error) {
-                showAlert('Login failed: ' + error.message);
+                console.error('Login error:', error);
+                showAlert('❌ Login Error\n\n' + error.message);
+                loginBtn.disabled = false;
+                loginBtn.innerText = '🔐 Sign in with Google';
             }
         }
 
@@ -715,10 +709,12 @@
                     loadHistory();
                     checkPoolStatus();
                 } else {
+                    showAlert('Session expired. Please login again.');
                     logout();
                 }
             } catch (error) {
                 console.error('Error loading dashboard:', error);
+                showAlert('Error loading dashboard: ' + error.message);
             }
         }
 
@@ -772,8 +768,8 @@
         // Pay via PhonePe
         function payViaPhonePe() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
-            if (amount < 1.50) {
-                showAlert('Minimum amount is ₹1.50');
+            if (amount < 3) {
+                showAlert('Minimum amount is ₹3');
                 return;
             }
             const upiUrl = `upi://pay?pa=8423609308@ybl&pn=AnonymousCall&am=${amount.toFixed(2)}&cu=INR`;
@@ -783,8 +779,8 @@
         // Add Balance
         async function confirmAndAddMinutes() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
-            if (amount < 1.50) {
-                showAlert('Enter valid amount (min ₹1.50)');
+            if (amount < 3) {
+                showAlert('Enter valid amount (min ₹3)');
                 return;
             }
 
