@@ -18,14 +18,19 @@ if (!process.env.JWT_SECRET) {
     process.exit(1);
 }
 
-if (!process.env.ENCRYPTION_KEY) {
-    console.error('ENCRYPTION_KEY is not defined in .env file');
+if (!process.env.EDESY_API_KEY) {
+    console.error('EDESY_API_KEY is not defined in .env file');
     process.exit(1);
 }
 
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '100kb' }));
+
+app.use(express.json({
+    limit: '100kb'
+}));
+
 app.use(cors());
+
 app.use(express.static('public'));
 
 app.get('/dashboard', (req, res) => {
@@ -39,7 +44,9 @@ app.get('/dashboard.html', (req, res) => {
 const callLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
-    validate: { trustProxy: false },
+    validate: {
+        trustProxy: false
+    },
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -57,26 +64,6 @@ const loginLimiter = rateLimit({
     }
 });
 
-const otpLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000,
-    max: 5,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        error: 'OTP bahut jaldi bheja diya gaya. Kripya baad mein try karein.'
-    }
-});
-
-const verifyOtpLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        error: 'Too many OTP verification attempts. Please try again later.'
-    }
-});
-
 const rechargeLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: 20,
@@ -88,16 +75,26 @@ const rechargeLimiter = rateLimit({
 });
 
 const CALL_RATE_PER_MINUTE = 3.00;
+const GST_RATE = 0.18;
+const USER_RATE_WITH_GST = Number(
+    (CALL_RATE_PER_MINUTE * (1 + GST_RATE)).toFixed(2)
+);
+
 const COMMISSION_PER_MINUTE = 1.50;
-const ACTUAL_RATE_PER_MINUTE = CALL_RATE_PER_MINUTE;
+const EDESY_RATE_WITH_GST = Number(
+    (COMMISSION_PER_MINUTE * (1 + GST_RATE)).toFixed(2)
+);
+
+const MAX_CALL_MINUTES = 60;
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
-    const token = authHeader &&
+    const token =
+        authHeader &&
         authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : null;
+            ? authHeader.slice(7)
+            : null;
 
     if (!token) {
         return res.status(401).json({
@@ -158,6 +155,71 @@ function getClientIp(req) {
     return req.socket.remoteAddress || 'Unknown';
 }
 
+function calculateBilling(actualDurationSeconds) {
+    const seconds = Math.max(
+        0,
+        Math.floor(Number(actualDurationSeconds) || 0)
+    );
+
+    const billableMinutes =
+        seconds > 0
+            ? Math.ceil(seconds / 60)
+            : 0;
+
+    const baseCost = Number(
+        (
+            billableMinutes *
+            CALL_RATE_PER_MINUTE
+        ).toFixed(2)
+    );
+
+    const gstAmount = Number(
+        (
+            baseCost *
+            GST_RATE
+        ).toFixed(2)
+    );
+
+    const totalCost = Number(
+        (
+            baseCost +
+            gstAmount
+        ).toFixed(2)
+    );
+
+    const providerBaseCost = Number(
+        (
+            billableMinutes *
+            COMMISSION_PER_MINUTE
+        ).toFixed(2)
+    );
+
+    const providerGst = Number(
+        (
+            providerBaseCost *
+            GST_RATE
+        ).toFixed(2)
+    );
+
+    const providerTotalCost = Number(
+        (
+            providerBaseCost +
+            providerGst
+        ).toFixed(2)
+    );
+
+    return {
+        actualDurationSeconds: seconds,
+        billableMinutes,
+        baseCost,
+        gstAmount,
+        totalCost,
+        providerBaseCost,
+        providerGst,
+        providerTotalCost
+    };
+}
+
 const userSchema = new mongoose.Schema({
     googleId: {
         type: String,
@@ -212,15 +274,30 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-userSchema.index({ createdAt: -1 });
-userSchema.index({ email: 1, googleId: 1 });
+userSchema.index({
+    createdAt: -1
+});
 
-const User = mongoose.model('User', userSchema);
+userSchema.index({
+    email: 1,
+    googleId: 1
+});
+
+const User = mongoose.model(
+    'User',
+    userSchema
+);
 
 const callSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
+        index: true
+    },
+
+    callSid: {
+        type: String,
+        default: null,
         index: true
     },
 
@@ -234,10 +311,32 @@ const callSchema = new mongoose.Schema({
         required: true
     },
 
+    status: {
+        type: String,
+        enum: [
+            'initiated',
+            'ringing',
+            'answered',
+            'completed',
+            'failed',
+            'no-answer',
+            'cancelled'
+        ],
+        default: 'initiated',
+        index: true
+    },
+
+    maxDurationMinutes: {
+        type: Number,
+        default: null,
+        min: 1,
+        max: MAX_CALL_MINUTES
+    },
+
     durationMinutes: {
         type: Number,
         required: true,
-        min: 1
+        min: 0
     },
 
     durationSeconds: {
@@ -246,10 +345,67 @@ const callSchema = new mongoose.Schema({
         min: 0
     },
 
+    baseCost: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    gstAmount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
     cost: {
         type: Number,
         required: true,
-        min: 3
+        min: 0
+    },
+
+    providerBaseCost: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    providerGst: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    providerTotalCost: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    reservedAmount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    billingFinalized: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+
+    startedAt: {
+        type: Date,
+        default: Date.now
+    },
+
+    answeredAt: {
+        type: Date,
+        default: null
+    },
+
+    endedAt: {
+        type: Date,
+        default: null
     },
 
     clientIp: {
@@ -260,6 +416,11 @@ const callSchema = new mongoose.Schema({
         type: String
     },
 
+    edesyData: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+
     date: {
         type: Date,
         default: Date.now,
@@ -267,8 +428,18 @@ const callSchema = new mongoose.Schema({
     }
 });
 
-callSchema.index({ userId: 1, date: -1 });
-callSchema.index({ date: -1 });
+callSchema.index({
+    userId: 1,
+    date: -1
+});
+
+callSchema.index({
+    callSid: 1
+});
+
+callSchema.index({
+    date: -1
+});
 
 const CallHistory = mongoose.model(
     'CallHistory',
@@ -452,6 +623,7 @@ app.post(
                     user.termsAccepted = true;
                     user.termsAcceptedAt =
                         new Date();
+
                     changed = true;
                 }
 
@@ -504,19 +676,33 @@ app.post(
     rechargeLimiter,
     async (req, res) => {
         try {
-            const amount =
+            const baseAmount =
                 Number(req.body.amount);
 
             if (
-                !Number.isFinite(amount) ||
-                amount <= 0 ||
-                amount > 100000
+                !Number.isFinite(baseAmount) ||
+                baseAmount <= 0 ||
+                baseAmount > 100000
             ) {
                 return res.status(400).json({
                     error:
                         'Valid recharge amount required'
                 });
             }
+
+            const gstAmount = Number(
+                (
+                    baseAmount *
+                    GST_RATE
+                ).toFixed(2)
+            );
+
+            const totalAmount = Number(
+                (
+                    baseAmount +
+                    gstAmount
+                ).toFixed(2)
+            );
 
             if (
                 process.env.NODE_ENV ===
@@ -542,7 +728,7 @@ app.post(
             user.balance = Number(
                 (
                     user.balance +
-                    amount
+                    baseAmount
                 ).toFixed(2)
             );
 
@@ -552,6 +738,11 @@ app.post(
                 success: true,
                 message:
                     'Development recharge successful.',
+                baseAmount,
+                gstAmount,
+                totalAmount,
+                creditedAmount:
+                    baseAmount,
                 newBalance:
                     user.balance
             });
@@ -696,37 +887,41 @@ app.post(
                 !Number.isFinite(
                     user.balance
                 ) ||
-                user.balance <
-                    ACTUAL_RATE_PER_MINUTE
+                user.balance < USER_RATE_WITH_GST
             ) {
                 return res.status(400).json({
                     error:
-                        `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
+                        `Wallet balance khatam! Minimum ₹${USER_RATE_WITH_GST.toFixed(2)} required.`
                 });
             }
 
             let maxAllowedMinutes =
                 Math.floor(
                     user.balance /
-                    ACTUAL_RATE_PER_MINUTE
+                    USER_RATE_WITH_GST
                 );
 
-            if (
-                maxAllowedMinutes < 1
-            ) {
-                maxAllowedMinutes = 1;
+            maxAllowedMinutes =
+                Math.min(
+                    maxAllowedMinutes,
+                    MAX_CALL_MINUTES
+                );
+
+            if (maxAllowedMinutes < 1) {
+                return res.status(400).json({
+                    error:
+                        `Minimum ₹${USER_RATE_WITH_GST.toFixed(2)} balance required.`
+                });
             }
 
             let durationLimitMinutes =
                 maxAllowedMinutes;
 
             if (
-                maxDuration !==
-                    undefined &&
+                maxDuration !== undefined &&
                 maxDuration !== null &&
                 maxDuration !== '' &&
-                maxDuration !==
-                    'unlimited'
+                maxDuration !== 'unlimited'
             ) {
                 const requestedMins =
                     Number(maxDuration);
@@ -736,11 +931,11 @@ app.post(
                         requestedMins
                     ) ||
                     requestedMins < 1 ||
-                    requestedMins > 60
+                    requestedMins > MAX_CALL_MINUTES
                 ) {
                     return res.status(400).json({
                         error:
-                            'Maximum duration must be between 1 and 60 minutes.'
+                            `Maximum duration must be between 1 and ${MAX_CALL_MINUTES} minutes.`
                     });
                 }
 
@@ -751,24 +946,19 @@ app.post(
                     );
             }
 
-            if (
-                !process.env.EDESY_API_KEY
-            ) {
-                return res.status(500).json({
-                    error:
-                        'Server configuration error: EDESY_API_KEY missing'
-                });
-            }
+            const reserveAmount =
+                Number(
+                    (
+                        durationLimitMinutes *
+                        USER_RATE_WITH_GST
+                    ).toFixed(2)
+                );
 
             const formattedPartyA =
-                userPhone.startsWith('91')
-                    ? userPhone
-                    : '91' + userPhone;
+                userPhone;
 
             const formattedPartyB =
-                phoneNumber.startsWith('91')
-                    ? phoneNumber
-                    : '91' + phoneNumber;
+                phoneNumber;
 
             const edesyResponse =
                 await fetch(
@@ -785,9 +975,7 @@ app.post(
                             party_a:
                                 formattedPartyA,
                             party_b:
-                                formattedPartyB,
-                            max_duration:
-                                durationLimitMinutes
+                                formattedPartyB
                         })
                     }
                 );
@@ -813,35 +1001,43 @@ app.post(
                     errorMsg =
                         edesyData.message ||
                         edesyData.error ||
+                        edesyData.data?.message ||
                         'Edesy API error occurred';
                 }
 
                 return res.status(400).json({
-                    error: errorMsg
+                    error: errorMsg,
+                    edesy:
+                        edesyData
                 });
             }
 
-            const billedMinutes = 1;
+            const callSid =
+                edesyData?.call_sid ||
+                edesyData?.data?.call_sid ||
+                edesyData?.callSid ||
+                edesyData?.data?.callSid ||
+                null;
 
-            const callCost = Number(
-                (
-                    billedMinutes *
-                    ACTUAL_RATE_PER_MINUTE
-                ).toFixed(2)
-            );
+            if (!callSid) {
+                return res.status(502).json({
+                    error:
+                        'Edesy did not return a call_sid. Call was not billed.'
+                });
+            }
 
             const updatedUser =
                 await User.findOneAndUpdate(
                     {
                         _id: userId,
                         balance: {
-                            $gte: callCost
+                            $gte: reserveAmount
                         }
                     },
                     {
                         $inc: {
                             balance:
-                                -callCost
+                                -reserveAmount
                         }
                     },
                     {
@@ -867,28 +1063,48 @@ app.post(
             try {
                 await CallHistory.create({
                     userId,
+                    callSid,
                     callerPhone:
                         userPhone,
                     targetPhone:
                         phoneNumber,
+                    status:
+                        'initiated',
+                    maxDurationMinutes:
+                        durationLimitMinutes,
                     durationMinutes:
-                        billedMinutes,
+                        0,
                     durationSeconds:
-                        60,
+                        0,
+                    baseCost:
+                        0,
+                    gstAmount:
+                        0,
                     cost:
-                        callCost,
+                        0,
+                    providerBaseCost:
+                        0,
+                    providerGst:
+                        0,
+                    providerTotalCost:
+                        0,
+                    reservedAmount:
+                        reserveAmount,
+                    billingFinalized:
+                        false,
+                    startedAt:
+                        new Date(),
                     clientIp,
-                    userAgent
+                    userAgent,
+                    edesyData
                 });
-            } catch (
-                historyError
-            ) {
+            } catch (historyError) {
                 await User.findByIdAndUpdate(
                     userId,
                     {
                         $inc: {
                             balance:
-                                callCost
+                                reserveAmount
                         }
                     }
                 );
@@ -900,12 +1116,19 @@ app.post(
                 success: true,
                 message:
                     'Call initiated successfully!',
+                callSid,
                 remainingBalance:
                     updatedUser.balance,
-                durationMinutes:
-                    billedMinutes,
-                cost:
-                    callCost,
+                reservedAmount:
+                    reserveAmount,
+                maxDurationMinutes:
+                    durationLimitMinutes,
+                ratePerMinute:
+                    CALL_RATE_PER_MINUTE,
+                gstRate:
+                    GST_RATE,
+                userRateWithGst:
+                    USER_RATE_WITH_GST,
                 edesy:
                     edesyData
             });
@@ -918,6 +1141,379 @@ app.post(
             res.status(500).json({
                 error:
                     'Server error during call'
+            });
+        }
+    }
+);
+
+function extractCallSid(payload) {
+    return (
+        payload?.call_sid ||
+        payload?.callSid ||
+        payload?.data?.call_sid ||
+        payload?.data?.callSid ||
+        payload?.call?.call_sid ||
+        payload?.call?.callSid ||
+        null
+    );
+}
+
+function extractDurationSeconds(payload) {
+    const values = [
+        payload?.duration_seconds,
+        payload?.durationSeconds,
+        payload?.call_duration,
+        payload?.callDuration,
+        payload?.duration,
+        payload?.data?.duration_seconds,
+        payload?.data?.durationSeconds,
+        payload?.data?.call_duration,
+        payload?.data?.callDuration,
+        payload?.data?.duration,
+        payload?.call?.duration_seconds,
+        payload?.call?.durationSeconds,
+        payload?.call?.call_duration,
+        payload?.call?.callDuration,
+        payload?.call?.duration
+    ];
+
+    for (const value of values) {
+        const seconds = Number(value);
+
+        if (
+            Number.isFinite(seconds) &&
+            seconds >= 0
+        ) {
+            return Math.floor(seconds);
+        }
+    }
+
+    return 0;
+}
+
+function extractEventName(payload) {
+    return String(
+        payload?.event ||
+        payload?.event_type ||
+        payload?.eventType ||
+        payload?.type ||
+        payload?.status ||
+        payload?.call_status ||
+        payload?.callStatus ||
+        payload?.data?.event ||
+        payload?.data?.event_type ||
+        payload?.data?.eventType ||
+        payload?.data?.status ||
+        ''
+    ).toLowerCase();
+}
+
+function extractStatus(payload) {
+    const eventName =
+        extractEventName(payload);
+
+    if (
+        eventName.includes('no-answer') ||
+        eventName.includes('no_answer') ||
+        eventName.includes('noanswer')
+    ) {
+        return 'no-answer';
+    }
+
+    if (
+        eventName.includes('failed') ||
+        eventName.includes('failure')
+    ) {
+        return 'failed';
+    }
+
+    if (
+        eventName.includes('cancel')
+    ) {
+        return 'cancelled';
+    }
+
+    if (
+        eventName.includes('answered') ||
+        eventName.includes('bridged')
+    ) {
+        return 'answered';
+    }
+
+    if (
+        eventName.includes('ring')
+    ) {
+        return 'ringing';
+    }
+
+    if (
+        eventName.includes('started') ||
+        eventName.includes('initiated')
+    ) {
+        return 'initiated';
+    }
+
+    if (
+        eventName.includes('ended') ||
+        eventName.includes('completed') ||
+        eventName.includes('expired')
+    ) {
+        return 'completed';
+    }
+
+    return null;
+}
+
+function verifyEdesyWebhook(req) {
+    const secret =
+        process.env.EDESY_WEBHOOK_SECRET;
+
+    if (!secret) {
+        return false;
+    }
+
+    const received =
+        req.headers['x-edesy-signature'];
+
+    if (
+        typeof received !== 'string' ||
+        !received
+    ) {
+        return false;
+    }
+
+    const rawBody =
+        req.rawBody ||
+        JSON.stringify(req.body);
+
+    const expected =
+        crypto
+            .createHmac(
+                'sha256',
+                secret
+            )
+            .update(rawBody)
+            .digest('hex');
+
+    const normalizedReceived =
+        received.startsWith('sha256=')
+            ? received.slice(7)
+            : received;
+
+    if (
+        normalizedReceived.length !==
+        expected.length
+    ) {
+        return false;
+    }
+
+    try {
+        return crypto.timingSafeEqual(
+            Buffer.from(
+                normalizedReceived
+            ),
+            Buffer.from(expected)
+        );
+    } catch {
+        return false;
+    }
+}
+
+app.post(
+    '/api/webhooks/edesy',
+    express.raw({
+        type: 'application/json',
+        limit: '100kb'
+    }),
+    async (req, res) => {
+        try {
+            const rawBody =
+                Buffer.isBuffer(req.body)
+                    ? req.body.toString('utf8')
+                    : JSON.stringify(req.body);
+
+            req.rawBody = rawBody;
+
+            try {
+                req.body =
+                    JSON.parse(rawBody);
+            } catch {
+                return res.status(400).json({
+                    error:
+                        'Invalid webhook JSON'
+                });
+            }
+
+            if (
+                process.env.EDESY_WEBHOOK_SECRET &&
+                !verifyEdesyWebhook(req)
+            ) {
+                return res.status(401).json({
+                    error:
+                        'Invalid webhook signature'
+                });
+            }
+
+            const payload =
+                req.body;
+
+            const callSid =
+                extractCallSid(payload);
+
+            if (!callSid) {
+                return res.status(400).json({
+                    error:
+                        'call_sid missing'
+                });
+            }
+
+            const history =
+                await CallHistory.findOne({
+                    callSid
+                });
+
+            if (!history) {
+                return res.status(404).json({
+                    error:
+                        'Call history not found'
+                });
+            }
+
+            const status =
+                extractStatus(payload);
+
+            const durationSeconds =
+                extractDurationSeconds(
+                    payload
+                );
+
+            if (
+                status === 'completed' ||
+                status === 'failed' ||
+                status === 'no-answer' ||
+                status === 'cancelled'
+            ) {
+                if (
+                    history.billingFinalized
+                ) {
+                    return res.json({
+                        success: true,
+                        alreadyFinalized:
+                            true
+                    });
+                }
+
+                const billing =
+                    durationSeconds > 0
+                        ? calculateBilling(
+                              durationSeconds
+                          )
+                        : {
+                              actualDurationSeconds: 0,
+                              billableMinutes: 0,
+                              baseCost: 0,
+                              gstAmount: 0,
+                              totalCost: 0,
+                              providerBaseCost: 0,
+                              providerGst: 0,
+                              providerTotalCost: 0
+                          };
+
+                const finalCharge =
+                    Math.min(
+                        billing.totalCost,
+                        history.reservedAmount
+                    );
+
+                const refund =
+                    Number(
+                        (
+                            history.reservedAmount -
+                            finalCharge
+                        ).toFixed(2)
+                    );
+
+                if (refund > 0) {
+                    await User.findByIdAndUpdate(
+                        history.userId,
+                        {
+                            $inc: {
+                                balance:
+                                    refund
+                            }
+                        }
+                    );
+                }
+
+                history.status =
+                    status;
+
+                history.durationSeconds =
+                    billing.actualDurationSeconds;
+
+                history.durationMinutes =
+                    billing.billableMinutes;
+
+                history.baseCost =
+                    billing.baseCost;
+
+                history.gstAmount =
+                    billing.gstAmount;
+
+                history.cost =
+                    finalCharge;
+
+                history.providerBaseCost =
+                    billing.providerBaseCost;
+
+                history.providerGst =
+                    billing.providerGst;
+
+                history.providerTotalCost =
+                    billing.providerTotalCost;
+
+                history.endedAt =
+                    new Date();
+
+                history.billingFinalized =
+                    true;
+
+                history.edesyData =
+                    payload;
+
+                await history.save();
+            } else {
+                if (status) {
+                    history.status =
+                        status;
+                }
+
+                if (
+                    status === 'answered'
+                ) {
+                    history.answeredAt =
+                        history.answeredAt ||
+                        new Date();
+                }
+
+                history.edesyData =
+                    payload;
+
+                await history.save();
+            }
+
+            return res.json({
+                success: true
+            });
+        } catch (error) {
+            console.error(
+                'Edesy webhook error:',
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    'Webhook processing failed'
             });
         }
     }
@@ -1070,6 +1666,7 @@ if (
     console.error(
         'Invalid PORT in .env'
     );
+
     process.exit(1);
 }
 
@@ -1079,67 +1676,128 @@ async function migrateDatabase() {
             await CallHistory.find({});
 
         for (const h of histories) {
-            let actualSecs =
+            if (
+                h.billingFinalized
+            ) {
+                continue;
+            }
+
+            const actualSecs =
                 Number(
                     h.durationSeconds || 0
                 );
 
             if (
-                actualSecs <= 0 &&
-                h.durationMinutes > 0
-            ) {
-                actualSecs =
-                    Math.round(
-                        h.durationMinutes *
-                            60
-                    );
-            }
-
-            if (
-                actualSecs <= 0 &&
-                h.cost > 0
-            ) {
-                actualSecs =
-                    Math.round(
-                        (
-                            h.cost /
-                            ACTUAL_RATE_PER_MINUTE
-                        ) * 60
-                    );
-            }
-
-            const billedMinutes =
                 actualSecs > 0
-                    ? Math.ceil(
-                          actualSecs / 60
-                      )
-                    : 1;
-
-            const exactCost =
-                Number(
-                    (
-                        billedMinutes *
-                        ACTUAL_RATE_PER_MINUTE
-                    ).toFixed(2)
-                );
-
-            if (
-                h.cost !== exactCost ||
-                h.durationMinutes !==
-                    billedMinutes ||
-                h.durationSeconds !==
-                    actualSecs
             ) {
+                const billing =
+                    calculateBilling(
+                        actualSecs
+                    );
+
                 h.durationMinutes =
-                    billedMinutes;
+                    billing.billableMinutes;
 
                 h.durationSeconds =
-                    actualSecs;
+                    billing.actualDurationSeconds;
+
+                h.baseCost =
+                    billing.baseCost;
+
+                h.gstAmount =
+                    billing.gstAmount;
 
                 h.cost =
-                    exactCost;
+                    billing.totalCost;
+
+                h.providerBaseCost =
+                    billing.providerBaseCost;
+
+                h.providerGst =
+                    billing.providerGst;
+
+                h.providerTotalCost =
+                    billing.providerTotalCost;
+
+                h.billingFinalized =
+                    true;
 
                 await h.save();
+            } else {
+                if (
+                    h.durationMinutes > 0 &&
+                    h.cost > 0
+                ) {
+                    const legacyMinutes =
+                        Number(
+                            h.durationMinutes
+                        );
+
+                    const legacyBase =
+                        Number(
+                            (
+                                legacyMinutes *
+                                CALL_RATE_PER_MINUTE
+                            ).toFixed(2)
+                        );
+
+                    const legacyGst =
+                        Number(
+                            (
+                                legacyBase *
+                                GST_RATE
+                            ).toFixed(2)
+                        );
+
+                    h.durationSeconds =
+                        legacyMinutes * 60;
+
+                    h.durationMinutes =
+                        legacyMinutes;
+
+                    h.baseCost =
+                        legacyBase;
+
+                    h.gstAmount =
+                        legacyGst;
+
+                    h.cost =
+                        Number(
+                            (
+                                legacyBase +
+                                legacyGst
+                            ).toFixed(2)
+                        );
+
+                    h.providerBaseCost =
+                        Number(
+                            (
+                                legacyMinutes *
+                                COMMISSION_PER_MINUTE
+                            ).toFixed(2)
+                        );
+
+                    h.providerGst =
+                        Number(
+                            (
+                                h.providerBaseCost *
+                                GST_RATE
+                            ).toFixed(2)
+                        );
+
+                    h.providerTotalCost =
+                        Number(
+                            (
+                                h.providerBaseCost +
+                                h.providerGst
+                            ).toFixed(2)
+                        );
+
+                    h.billingFinalized =
+                        true;
+
+                    await h.save();
+                }
             }
         }
 
@@ -1157,7 +1815,7 @@ async function migrateDatabase() {
                     Number(
                         (
                             user.minutes *
-                            ACTUAL_RATE_PER_MINUTE
+                            USER_RATE_WITH_GST
                         ).toFixed(2)
                     );
 
@@ -1206,7 +1864,11 @@ async function startServer() {
                 );
 
                 console.log(
-                    `Call Rate: ₹${ACTUAL_RATE_PER_MINUTE}/minute | Commission: ₹${COMMISSION_PER_MINUTE}/minute`
+                    `User Rate: ₹${CALL_RATE_PER_MINUTE}/minute + 18% GST = ₹${USER_RATE_WITH_GST}/minute`
+                );
+
+                console.log(
+                    `Edesy Rate: ₹${COMMISSION_PER_MINUTE}/minute + 18% GST = ₹${EDESY_RATE_WITH_GST}/minute`
                 );
             }
         );
