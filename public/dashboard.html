@@ -844,7 +844,7 @@ function calculateGst() {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${userToken}`
                         },
-                        body: JSON.stringify({ userId, baseAmount: amount })
+                        body: JSON.stringify({ amount: amount })
                     });
 
                     const data = await response.json();
