@@ -12,6 +12,14 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.static('public'));
 
+// Explicit Dashboard Route Fix
+app.get('/dashboard', (req, res) => {
+    res.sendFile(__dirname + '/public/dashboard.html');
+});
+app.get('/dashboard.html', (req, res) => {
+    res.sendFile(__dirname + '/public/dashboard.html');
+});
+
 // ============== RATE LIMITING ==============
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
