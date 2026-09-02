@@ -5,7 +5,6 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-// Trust proxy agar aap Heroku, Render, ya Vercel par deploy kar rahe hain taaki real client IP mil sake
 app.set('trust proxy', true); 
 app.use(cors());
 app.use(express.static('public'));
@@ -16,27 +15,46 @@ mongoose.connect(process.env.MONGO_URI, {
 }).then(async () => {
     console.log('MongoDB Connected');
     try {
+        // 1. Migrate Call History to 60s pulse (₹1.50 per minute flat block)
         const histories = await CallHistory.find({});
         for (let h of histories) {
-            const ratePerMinute = 3.00;
-            const exactCost = Number((h.durationMinutes * ratePerMinute).toFixed(2));
-            if (h.cost !== exactCost) {
+            let actualSecs = h.durationSeconds || Math.round((h.durationMinutes || 0) * 60);
+            if (actualSecs <= 0 && h.cost) {
+                // Approximate back-calculation if seconds missing
+                actualSecs = Math.round((h.cost / 1.50) * 60);
+            }
+            const billedMinutes = actualSecs > 0 ? Math.ceil(actualSecs / 60) : 1;
+            const exactCost = Number((billedMinutes * 1.50).toFixed(2));
+            
+            if (h.cost !== exactCost || h.durationMinutes !== billedMinutes) {
+                h.durationMinutes = billedMinutes;
+                h.durationSeconds = actualSecs;
                 h.cost = exactCost;
                 await h.save();
             }
         }
-        console.log('Call history migration & cost check completed.');
+
+        // 2. Migrate User balances from old minutes format to ₹ Balance if needed
+        const users = await User.find({});
+        for (let u of users) {
+            if (u.minutes !== undefined && u.minutes > 0 && u.balance === 0) {
+                u.balance = Number((u.minutes * 1.50).toFixed(2));
+                u.minutes = undefined; // clear old field
+                await u.save();
+            }
+        }
+        console.log('Automatic data migration & 60s pulse cost check completed successfully.');
     } catch (migErr) {
         console.error('Migration error:', migErr);
     }
 }).catch(err => console.log(err));
 
-// User Schema with Legal Terms Acceptance & IP Tracking
+// User Schema with Wallet Balance in Rupees (₹)
 const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
     name: String,
-    minutes: { type: Number, default: 0 },
+    balance: { type: Number, default: 0 }, // Wallet balance in ₹
     verifiedPhone: { type: String, default: null },
     otpCode: { type: String, default: null },
     otpExpires: { type: Date, default: null },
@@ -46,15 +64,16 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// Call History Schema with Audit Trail (IP, Timestamp, Verified Party A & Target Party B)
+// Call History Schema with Audit Trail
 const callSchema = new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
-    callerPhone: String,      // Party A (User's Verified Phone)
-    targetPhone: String,      // Party B (Destination Number)
-    durationMinutes: Number,  
-    cost: Number,
-    clientIp: String,         // User IP Address for Legal Audit Trail
-    userAgent: String,        // Device/Browser info
+    callerPhone: String,      // Party A
+    targetPhone: String,      // Party B
+    durationMinutes: Number,  // Billed minutes (60s pulse blocks)
+    durationSeconds: Number,  // Actual talk seconds
+    cost: Number,             // Cost in ₹ (₹1.50 per pulse)
+    clientIp: String,         
+    userAgent: String,        
     date: { type: Date, default: Date.now }
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
@@ -79,24 +98,25 @@ async function getEdesyBalance() {
     }
 }
 
-async function getTotalAssignedUserMinutes() {
+async function getTotalAssignedPoolRupees() {
     try {
         const result = await User.aggregate([
-            { $group: { _id: null, totalMinutes: { $sum: "$minutes" } } }
+            { $group: { _id: null, totalBalance: { $sum: "$balance" } } }
         ]);
-        return result.length > 0 ? Number(result[0].totalMinutes) : 0;
+        return result.length > 0 ? Number(result[0].totalBalance) : 0;
     } catch (err) {
-        console.error('Error calculating assigned user minutes:', err);
+        console.error('Error calculating assigned pool:', err);
         return 0;
     }
 }
 
 app.get('/api/pool-status', async (req, res) => {
     try {
-        const edesyTotal = await getEdesyBalance();
-        const assignedTotal = await getTotalAssignedUserMinutes();
-        const availablePool = Number((edesyTotal - assignedTotal).toFixed(2));
-        res.json({ edesyTotal, assignedTotal, availablePool });
+        const edesyTotalMins = await getEdesyBalance();
+        const edesyTotalRupees = edesyTotalMins * 1.50;
+        const assignedRupees = await getTotalAssignedPoolRupees();
+        const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
+        res.json({ edesyTotalRupees, assignedRupees, availablePoolRupees });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch pool status' });
     }
@@ -115,27 +135,17 @@ app.post('/auth/google-login', async (req, res) => {
                 return res.status(400).json({ error: 'You must accept the Terms of Service and Privacy Policy to register.' });
             }
 
-            const edesyTotal = await getEdesyBalance();
-            const assignedTotal = await getTotalAssignedUserMinutes();
-            const availablePool = edesyTotal - assignedTotal;
-
-            let freeMinutes = 0;
-            if (availablePool >= 1) {
-                freeMinutes = 1;
-            }
-
             user = new User({ 
                 email, 
                 name, 
                 googleId, 
-                minutes: freeMinutes,
+                balance: 0, 
                 termsAccepted: true,
                 termsAcceptedAt: new Date(),
                 signupIp: clientIp
             });
             await user.save();
         } else {
-            // Update terms if not previously accepted
             if (!user.termsAccepted && termsAccepted) {
                 user.termsAccepted = true;
                 user.termsAcceptedAt = new Date();
@@ -154,7 +164,7 @@ app.get('/api/balance/:userId', async (req, res) => {
         const user = await User.findById(req.params.userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json({ 
-            minutes: user.minutes, 
+            balance: user.balance, // Returns wallet balance in ₹
             name: user.name, 
             verifiedPhone: user.verifiedPhone || '',
             termsAccepted: user.termsAccepted 
@@ -210,40 +220,39 @@ app.post('/api/verify-otp', async (req, res) => {
 app.post('/api/add-recharge', async (req, res) => {
     const { userId, baseAmount } = req.body;
     try {
-        if (!baseAmount || baseAmount < 2) {
-            return res.status(400).json({ error: 'Minimum recharge amount is ₹2.' });
+        const amount = Number(baseAmount);
+        if (!amount || amount < 1.50) {
+            return res.status(400).json({ error: 'Minimum recharge amount is ₹1.50.' });
         }
 
-        const ratePerMinute = 3.00;
-        const minutesToAdd = Number((baseAmount / ratePerMinute).toFixed(2));
+        const edesyTotalMins = await getEdesyBalance();
+        const edesyTotalRupees = edesyTotalMins * 1.50;
+        const assignedRupees = await getTotalAssignedPoolRupees();
+        const availablePoolRupees = Number((edesyTotalRupees - assignedRupees).toFixed(2));
 
-        const edesyTotal = await getEdesyBalance();
-        const assignedTotal = await getTotalAssignedUserMinutes();
-        const availablePool = Number((edesyTotal - assignedTotal).toFixed(2));
-
-        if (minutesToAdd > availablePool) {
+        if (amount > availablePoolRupees) {
             return res.status(400).json({ 
-                error: `Recharge blocked! Available pool: ${availablePool} minutes.` 
+                error: `Recharge blocked! Available pool balance: ₹${availablePoolRupees}` 
             });
         }
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        user.minutes += minutesToAdd;
+        user.balance = Number((user.balance + amount).toFixed(2));
         await user.save();
 
         res.json({ 
             success: true, 
-            message: `Payment confirmed! ${minutesToAdd} minutes added successfully.`,
-            newBalance: user.minutes
+            message: `Payment confirmed! ₹${amount} added successfully.`,
+            newBalance: user.balance
         });
     } catch (error) {
-        res.status(500).json({ error: 'Error adding recharge minutes' });
+        res.status(500).json({ error: 'Error adding recharge amount' });
     }
 });
 
-// Call API with Full Audit Trail (IP tracking, verified Party A, Target Party B)
+// Call API with 60-Second Pulse Logic (₹1.50 per block)
 app.post('/api/call', async (req, res) => {
     const { userId, phoneNumber, maxDuration, actualDurationSeconds } = req.body;
     
@@ -259,20 +268,27 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: 'Pehle aapko apna mobile number OTP se verify karna hoga tabhi call lagegi!' });
         }
 
-        const userPhone = user.verifiedPhone; // Party A locked to verified number
+        const userPhone = user.verifiedPhone; 
+        const ratePerPulse = 1.50; // ₹1.50 per 60 seconds pulse
 
-        if (user.minutes <= 0) {
-            return res.status(400).json({ error: 'Aapka balance khatam ho chuka hai! Kripya recharge karein.' });
+        if (user.balance < ratePerPulse) {
+            return res.status(400).json({ error: 'Aapka wallet balance khatam ho chuka hai! Kripya recharge karein (Minimum ₹1.50 required).' });
         }
 
-        let durationLimit = 1.0;
-        if (maxDuration === 'unlimited') {
-            durationLimit = Number(user.minutes.toFixed(2));
-        } else {
-            durationLimit = Number(maxDuration);
-            if (user.minutes < durationLimit) {
-                return res.status(400).json({ error: `Aapke paas sirf ${user.minutes.toFixed(2)} minutes bache hain.` });
+        // Max duration calculate based on wallet balance
+        let maxAllowedMinutes = Math.floor(user.balance / ratePerPulse);
+        if (maxAllowedMinutes < 1) maxAllowedMinutes = 1;
+
+        let durationLimitMinutes = maxAllowedMinutes;
+        if (maxDuration !== 'unlimited' && maxDuration) {
+            const requestedMins = Number(maxDuration);
+            if (requestedMins < durationLimitMinutes) {
+                durationLimitMinutes = requestedMins;
             }
+        }
+
+        if (user.balance < (durationLimitMinutes * ratePerPulse)) {
+            return res.status(400).json({ error: `Aapke paas sufficient balance nahi hai. Required: ₹${durationLimitMinutes * ratePerPulse}` });
         }
 
         if (!process.env.EDESY_API_KEY) {
@@ -288,7 +304,7 @@ app.post('/api/call', async (req, res) => {
             body: JSON.stringify({ 
                 party_a: userPhone,
                 party_b: phoneNumber,
-                max_duration: durationLimit
+                max_duration: durationLimitMinutes
             })
         });
 
@@ -297,21 +313,22 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
-        let billedMinutes = durationLimit;
-        if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) {
-            let calculatedMins = Number((actualDurationSeconds / 60).toFixed(4));
-            if (calculatedMins < durationLimit) {
-                billedMinutes = Math.max(calculatedMins, 0.0167);
-            }
+        // 60-Second Pulse Calculation (Minimum 1 block = ₹1.50)
+        let actualSecs = actualDurationSeconds !== undefined && actualDurationSeconds !== null ? Number(actualDurationSeconds) : 0;
+        let billedMinutes = 1; // Default minimum 1 minute pulse
+        
+        if (actualSecs > 0) {
+            billedMinutes = Math.ceil(actualSecs / 60); // Round up to next minute block (60s pulse)
+        } else {
+            billedMinutes = durationLimitMinutes; // Fallback if seconds not passed
         }
 
-        const ratePerMinute = 3.00;
-        const callCost = Number((billedMinutes * ratePerMinute).toFixed(2));
+        const callCost = Number((billedMinutes * ratePerPulse).toFixed(2));
 
-        user.minutes = Math.max(0, Number((user.minutes - billedMinutes).toFixed(4)));
+        // Deduct from user wallet balance securely
+        user.balance = Math.max(0, Number((user.balance - callCost).toFixed(2)));
         await user.save();
 
-        // Capture client IP and User Agent for Legal Audit Trail
         const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         const userAgent = req.headers['user-agent'] || 'Unknown';
 
@@ -319,7 +336,8 @@ app.post('/api/call', async (req, res) => {
             userId, 
             callerPhone: userPhone,
             targetPhone: phoneNumber,
-            durationMinutes: Number(billedMinutes.toFixed(2)), 
+            durationMinutes: billedMinutes,
+            durationSeconds: actualSecs,
             cost: callCost,
             clientIp,
             userAgent
@@ -328,7 +346,7 @@ app.post('/api/call', async (req, res) => {
         res.json({ 
             success: true, 
             message: 'Call completed!', 
-            remainingMinutes: user.minutes,
+            remainingBalance: user.balance,
             durationMinutes: billedMinutes,
             cost: callCost
         });
