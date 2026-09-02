@@ -5,6 +5,8 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
+// Trust proxy agar aap Heroku, Render, ya Vercel par deploy kar rahe hain taaki real client IP mil sake
+app.set('trust proxy', true); 
 app.use(cors());
 app.use(express.static('public'));
 
@@ -14,11 +16,8 @@ mongoose.connect(process.env.MONGO_URI, {
 }).then(async () => {
     console.log('MongoDB Connected');
     try {
-        // Migration: Purane records ko exact duration aur cost ke hisab se fix karna
         const histories = await CallHistory.find({});
         for (let h of histories) {
-            // Agar durationMinutes seconds mein hai ya fractional hai, uske hisab se cost recalculate hogi
-            // Rate = ₹3.00 per minute (yani ₹0.05 per second)
             const ratePerMinute = 3.00;
             const exactCost = Number((h.durationMinutes * ratePerMinute).toFixed(2));
             if (h.cost !== exactCost) {
@@ -26,12 +25,13 @@ mongoose.connect(process.env.MONGO_URI, {
                 await h.save();
             }
         }
-        console.log('Call history migration completed successfully.');
+        console.log('Call history migration & cost check completed.');
     } catch (migErr) {
         console.error('Migration error:', migErr);
     }
 }).catch(err => console.log(err));
 
+// User Schema with Legal Terms Acceptance & IP Tracking
 const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
@@ -39,15 +39,22 @@ const userSchema = new mongoose.Schema({
     minutes: { type: Number, default: 0 },
     verifiedPhone: { type: String, default: null },
     otpCode: { type: String, default: null },
-    otpExpires: { type: Date, default: null }
+    otpExpires: { type: Date, default: null },
+    termsAccepted: { type: Boolean, default: false },
+    termsAcceptedAt: { type: Date, default: null },
+    signupIp: { type: String, default: null }
 });
 const User = mongoose.model('User', userSchema);
 
+// Call History Schema with Audit Trail (IP, Timestamp, Verified Party A & Target Party B)
 const callSchema = new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
-    phoneNumber: String,
-    durationMinutes: Number, // Yeh fractional minutes bhi ho sakta hai (jaise 0.33 mins for 20 seconds)
+    callerPhone: String,      // Party A (User's Verified Phone)
+    targetPhone: String,      // Party B (Destination Number)
+    durationMinutes: Number,  
     cost: Number,
+    clientIp: String,         // User IP Address for Legal Audit Trail
+    userAgent: String,        // Device/Browser info
     date: { type: Date, default: Date.now }
 });
 const CallHistory = mongoose.model('CallHistory', callSchema);
@@ -95,12 +102,19 @@ app.get('/api/pool-status', async (req, res) => {
     }
 });
 
+// Google Login with Terms Acceptance & IP Logging
 app.post('/auth/google-login', async (req, res) => {
     try {
-        const { email, name, googleId } = req.body;
+        const { email, name, googleId, termsAccepted } = req.body;
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
         let user = await User.findOne({ googleId });
         
         if (!user) {
+            if (!termsAccepted) {
+                return res.status(400).json({ error: 'You must accept the Terms of Service and Privacy Policy to register.' });
+            }
+
             const edesyTotal = await getEdesyBalance();
             const assignedTotal = await getTotalAssignedUserMinutes();
             const availablePool = edesyTotal - assignedTotal;
@@ -110,8 +124,24 @@ app.post('/auth/google-login', async (req, res) => {
                 freeMinutes = 1;
             }
 
-            user = new User({ email, name, googleId, minutes: freeMinutes });
+            user = new User({ 
+                email, 
+                name, 
+                googleId, 
+                minutes: freeMinutes,
+                termsAccepted: true,
+                termsAcceptedAt: new Date(),
+                signupIp: clientIp
+            });
             await user.save();
+        } else {
+            // Update terms if not previously accepted
+            if (!user.termsAccepted && termsAccepted) {
+                user.termsAccepted = true;
+                user.termsAcceptedAt = new Date();
+                user.signupIp = clientIp;
+                await user.save();
+            }
         }
         res.json({ success: true, user });
     } catch (error) {
@@ -126,7 +156,8 @@ app.get('/api/balance/:userId', async (req, res) => {
         res.json({ 
             minutes: user.minutes, 
             name: user.name, 
-            verifiedPhone: user.verifiedPhone || '' 
+            verifiedPhone: user.verifiedPhone || '',
+            termsAccepted: user.termsAccepted 
         });
     } catch (error) {
         res.status(500).json({ error: 'Error fetching balance' });
@@ -212,19 +243,23 @@ app.post('/api/add-recharge', async (req, res) => {
     }
 });
 
+// Call API with Full Audit Trail (IP tracking, verified Party A, Target Party B)
 app.post('/api/call', async (req, res) => {
-    // Ab frontend se actual duration (seconds ya minutes mein) bhi a sakti hai jab call beech mein cut ho
     const { userId, phoneNumber, maxDuration, actualDurationSeconds } = req.body;
     
     try {
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
+        if (!user.termsAccepted) {
+            return res.status(400).json({ error: 'Aapko pehle Terms of Service accept karni hongi.' });
+        }
+
         if (!user.verifiedPhone) {
             return res.status(400).json({ error: 'Pehle aapko apna mobile number OTP se verify karna hoga tabhi call lagegi!' });
         }
 
-        const userPhone = user.verifiedPhone;
+        const userPhone = user.verifiedPhone; // Party A locked to verified number
 
         if (user.minutes <= 0) {
             return res.status(400).json({ error: 'Aapka balance khatam ho chuka hai! Kripya recharge karein.' });
@@ -262,13 +297,11 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
-        // Agar user ne call beech mein hi kaat di hai aur actualDurationSeconds mil gaya hai, 
-        // toh utne hi time ka charge katega. Varna max duration ka katega.
         let billedMinutes = durationLimit;
         if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) {
             let calculatedMins = Number((actualDurationSeconds / 60).toFixed(4));
             if (calculatedMins < durationLimit) {
-                billedMinutes = Math.max(calculatedMins, 0.0167); // Minimum 1 second / safeguard
+                billedMinutes = Math.max(calculatedMins, 0.0167);
             }
         }
 
@@ -278,11 +311,18 @@ app.post('/api/call', async (req, res) => {
         user.minutes = Math.max(0, Number((user.minutes - billedMinutes).toFixed(4)));
         await user.save();
 
+        // Capture client IP and User Agent for Legal Audit Trail
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+
         await CallHistory.create({ 
             userId, 
-            phoneNumber, 
-            durationMinutes: Number(billedMinutes.toFixed(2)), // History mein show karne ke liye clean format
-            cost: callCost 
+            callerPhone: userPhone,
+            targetPhone: phoneNumber,
+            durationMinutes: Number(billedMinutes.toFixed(2)), 
+            cost: callCost,
+            clientIp,
+            userAgent
         });
 
         res.json({ 
