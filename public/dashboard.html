@@ -541,11 +541,15 @@ function openPhonePeApp() {
         return;
     }
 
-    // PhonePe ka direct intent link
-    const phonePeUrl = `phonepe://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+    const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
     
-    // PhonePe app kholne ke liye redirect
-    window.location.href = phonePeUrl;
+    // Try to open UPI app, with a fallback
+    window.location.href = upiPayUrl;
+    
+    // Fallback message agar app trigger na ho
+    setTimeout(() => {
+        alert('Agar UPI app nahi khuli, toh aap niche diye gaye QR Code ko screenshot lekar ya gallery se scan karke payment kar sakte hain!');
+    }, 1500);
 }
 </script>
 

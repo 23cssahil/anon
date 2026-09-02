@@ -171,7 +171,7 @@ const userSchema = new mongoose.Schema({
     googleId: { type: String, required: true, unique: true, index: true },
     email: { type: String, required: true, unique: true, index: true, validate: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
     name: { type: String, required: true },
-    balance: { type: Number, default: 0, min: 0 },
+    balance: { type: Number, default: 2.00, min: 0 },
     verifiedPhone: { type: String, default: null, select: false },
     otpCode: { type: String, default: null },
     otpExpires: { type: Date, default: null },
