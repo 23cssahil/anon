@@ -93,7 +93,9 @@ const ACTUAL_RATE_PER_MINUTE = CALL_RATE_PER_MINUTE;
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
+
+    const token = authHeader &&
+        authHeader.startsWith('Bearer ')
         ? authHeader.slice(7)
         : null;
 
@@ -103,26 +105,31 @@ const authenticateToken = (req, res, next) => {
         });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({
-                error: 'Invalid or expired token'
-            });
-        }
+    jwt.verify(
+        token,
+        process.env.JWT_SECRET,
+        (err, user) => {
+            if (err) {
+                return res.status(403).json({
+                    error: 'Invalid or expired token'
+                });
+            }
 
-        if (!user || !user.userId) {
-            return res.status(403).json({
-                error: 'Invalid token payload'
-            });
-        }
+            if (!user || !user.userId) {
+                return res.status(403).json({
+                    error: 'Invalid token payload'
+                });
+            }
 
-        req.user = user;
-        next();
-    });
+            req.user = user;
+            next();
+        }
+    );
 };
 
 function validatePhone(phone) {
-    return typeof phone === 'string' && /^[6-9]\d{9}$/.test(phone);
+    return typeof phone === 'string' &&
+        /^[6-9]\d{9}$/.test(phone);
 }
 
 function validateEmail(email) {
@@ -141,90 +148,14 @@ function sanitizeInput(input) {
 function getClientIp(req) {
     const forwarded = req.headers['x-forwarded-for'];
 
-    if (typeof forwarded === 'string' && forwarded.length > 0) {
+    if (
+        typeof forwarded === 'string' &&
+        forwarded.length > 0
+    ) {
         return forwarded.split(',')[0].trim();
     }
 
     return req.socket.remoteAddress || 'Unknown';
-}
-
-function encryptSensitiveData(data) {
-    const algorithm = 'aes-256-cbc';
-
-    const secretKey = crypto.scryptSync(
-        process.env.ENCRYPTION_KEY,
-        'anon-app-salt',
-        32
-    );
-
-    const iv = crypto.randomBytes(16);
-
-    const cipher = crypto.createCipheriv(
-        algorithm,
-        secretKey,
-        iv
-    );
-
-    let encrypted = cipher.update(
-        data,
-        'utf8',
-        'hex'
-    );
-
-    encrypted += cipher.final('hex');
-
-    return iv.toString('hex') + ':' + encrypted;
-}
-
-function decryptSensitiveData(data) {
-    if (!data) {
-        return null;
-    }
-
-    if (!data.includes(':')) {
-        return data;
-    }
-
-    try {
-        const algorithm = 'aes-256-cbc';
-
-        const secretKey = crypto.scryptSync(
-            process.env.ENCRYPTION_KEY,
-            'anon-app-salt',
-            32
-        );
-
-        const parts = data.split(':');
-
-        if (parts.length !== 2) {
-            return null;
-        }
-
-        const iv = Buffer.from(parts[0], 'hex');
-
-        if (iv.length !== 16) {
-            return null;
-        }
-
-        const decipher = crypto.createDecipheriv(
-            algorithm,
-            secretKey,
-            iv
-        );
-
-        let decrypted = decipher.update(
-            parts[1],
-            'hex',
-            'utf8'
-        );
-
-        decrypted += decipher.final('utf8');
-
-        return decrypted;
-    } catch (err) {
-        console.error('Phone decryption error:', err.message);
-        return null;
-    }
 }
 
 const userSchema = new mongoose.Schema({
@@ -257,30 +188,6 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         min: 0
-    },
-
-    verifiedPhone: {
-        type: String,
-        default: null,
-        select: false
-    },
-
-    otpCode: {
-        type: String,
-        default: null,
-        select: false
-    },
-
-    otpExpires: {
-        type: Date,
-        default: null,
-        select: false
-    },
-
-    otpAttempts: {
-        type: Number,
-        default: 0,
-        select: false
     },
 
     termsAccepted: {
@@ -363,7 +270,10 @@ const callSchema = new mongoose.Schema({
 callSchema.index({ userId: 1, date: -1 });
 callSchema.index({ date: -1 });
 
-const CallHistory = mongoose.model('CallHistory', callSchema);
+const CallHistory = mongoose.model(
+    'CallHistory',
+    callSchema
+);
 
 async function getEdesyBalance() {
     return 0;
@@ -397,18 +307,26 @@ async function getTotalAssignedPoolRupees() {
 
 app.get('/api/pool-status', async (req, res) => {
     try {
-        const edesyTotalMins = await getEdesyBalance();
+        const edesyTotalMins =
+            await getEdesyBalance();
 
         const edesyTotalRupees = Number(
-            (edesyTotalMins * COMMISSION_PER_MINUTE).toFixed(2)
+            (
+                edesyTotalMins *
+                COMMISSION_PER_MINUTE
+            ).toFixed(2)
         );
 
-        const assignedRupees = await getTotalAssignedPoolRupees();
+        const assignedRupees =
+            await getTotalAssignedPoolRupees();
 
         const availablePoolRupees = Math.max(
             0,
             Number(
-                (edesyTotalRupees - assignedRupees).toFixed(2)
+                (
+                    edesyTotalRupees -
+                    assignedRupees
+                ).toFixed(2)
             )
         );
 
@@ -429,135 +347,156 @@ app.get('/api/pool-status', async (req, res) => {
     }
 });
 
-app.post('/auth/google-login', loginLimiter, async (req, res) => {
-    try {
-        const {
-            email,
-            name,
-            googleId,
-            termsAccepted
-        } = req.body;
+app.post(
+    '/auth/google-login',
+    loginLimiter,
+    async (req, res) => {
+        try {
+            const {
+                email,
+                name,
+                googleId,
+                termsAccepted
+            } = req.body;
 
-        if (!email || !validateEmail(email)) {
-            return res.status(400).json({
-                error: 'Invalid email format'
-            });
-        }
-
-        if (
-            !name ||
-            typeof name !== 'string' ||
-            name.trim().length < 2
-        ) {
-            return res.status(400).json({
-                error: 'Name must be at least 2 characters'
-            });
-        }
-
-        if (
-            !googleId ||
-            typeof googleId !== 'string' ||
-            googleId.trim().length < 5
-        ) {
-            return res.status(400).json({
-                error: 'Google ID is required'
-            });
-        }
-
-        const cleanEmail = sanitizeInput(email).toLowerCase();
-        const cleanName = sanitizeInput(name);
-        const cleanGoogleId = sanitizeInput(googleId);
-        const clientIp = getClientIp(req);
-
-        let user = await User.findOne({
-            googleId: cleanGoogleId
-        });
-
-        if (!user) {
-            const existingEmailUser = await User.findOne({
-                email: cleanEmail
-            });
-
-            if (existingEmailUser) {
-                return res.status(409).json({
-                    error: 'An account with this email already exists.'
-                });
-            }
-
-            if (!termsAccepted) {
+            if (!email || !validateEmail(email)) {
                 return res.status(400).json({
-                    error: 'Aapko Terms of Service and Privacy Policy accept karni hongi.'
+                    error: 'Invalid email format'
                 });
             }
 
-            user = new User({
-                email: cleanEmail,
-                name: cleanName,
-                googleId: cleanGoogleId,
-                balance: 0,
-                termsAccepted: true,
-                termsAcceptedAt: new Date(),
-                signupIp: clientIp
+            if (
+                !name ||
+                typeof name !== 'string' ||
+                name.trim().length < 2
+            ) {
+                return res.status(400).json({
+                    error: 'Name must be at least 2 characters'
+                });
+            }
+
+            if (
+                !googleId ||
+                typeof googleId !== 'string' ||
+                googleId.trim().length < 5
+            ) {
+                return res.status(400).json({
+                    error: 'Google ID is required'
+                });
+            }
+
+            const cleanEmail =
+                sanitizeInput(email).toLowerCase();
+
+            const cleanName =
+                sanitizeInput(name);
+
+            const cleanGoogleId =
+                sanitizeInput(googleId);
+
+            const clientIp =
+                getClientIp(req);
+
+            let user = await User.findOne({
+                googleId: cleanGoogleId
             });
 
-            await user.save();
-        } else {
-            let changed = false;
+            if (!user) {
+                const existingEmailUser =
+                    await User.findOne({
+                        email: cleanEmail
+                    });
 
-            if (user.email !== cleanEmail) {
-                user.email = cleanEmail;
-                changed = true;
-            }
+                if (existingEmailUser) {
+                    return res.status(409).json({
+                        error:
+                            'An account with this email already exists.'
+                    });
+                }
 
-            if (user.name !== cleanName) {
-                user.name = cleanName;
-                changed = true;
-            }
+                if (!termsAccepted) {
+                    return res.status(400).json({
+                        error:
+                            'Aapko Terms of Service and Privacy Policy accept karni hongi.'
+                    });
+                }
 
-            if (!user.termsAccepted && termsAccepted) {
-                user.termsAccepted = true;
-                user.termsAcceptedAt = new Date();
-                changed = true;
-            }
+                user = new User({
+                    email: cleanEmail,
+                    name: cleanName,
+                    googleId: cleanGoogleId,
+                    balance: 0,
+                    termsAccepted: true,
+                    termsAcceptedAt: new Date(),
+                    signupIp: clientIp
+                });
 
-            if (changed) {
                 await user.save();
+            } else {
+                let changed = false;
+
+                if (user.email !== cleanEmail) {
+                    user.email = cleanEmail;
+                    changed = true;
+                }
+
+                if (user.name !== cleanName) {
+                    user.name = cleanName;
+                    changed = true;
+                }
+
+                if (
+                    !user.termsAccepted &&
+                    termsAccepted
+                ) {
+                    user.termsAccepted = true;
+                    user.termsAcceptedAt =
+                        new Date();
+                    changed = true;
+                }
+
+                if (changed) {
+                    await user.save();
+                }
             }
+
+            const token = jwt.sign(
+                {
+                    userId:
+                        user._id.toString(),
+                    email: user.email
+                },
+                process.env.JWT_SECRET,
+                {
+                    expiresIn: '7d'
+                }
+            );
+
+            res.json({
+                success: true,
+                token,
+                user: {
+                    userId:
+                        user._id.toString(),
+                    name: user.name,
+                    email: user.email,
+                    balance: user.balance,
+                    termsAccepted:
+                        user.termsAccepted
+                }
+            });
+        } catch (error) {
+            console.error(
+                'Login error:',
+                error.message
+            );
+
+            res.status(500).json({
+                error: 'Server error during login'
+            });
         }
-
-        const token = jwt.sign(
-            {
-                userId: user._id.toString(),
-                email: user.email
-            },
-            process.env.JWT_SECRET,
-            {
-                expiresIn: '7d'
-            }
-        );
-
-        res.json({
-            success: true,
-            token,
-            user: {
-                userId: user._id.toString(),
-                name: user.name,
-                email: user.email,
-                balance: user.balance,
-                termsAccepted: user.termsAccepted
-            }
-        });
-    } catch (error) {
-        console.error(
-            'Login error:',
-            error.message
-        );
-
-        res.status(500).json({
-            error: 'Server error during login'
-        });
     }
-});
+);
 
 app.post(
     '/api/add-recharge',
@@ -565,7 +504,8 @@ app.post(
     rechargeLimiter,
     async (req, res) => {
         try {
-            const amount = Number(req.body.amount);
+            const amount =
+                Number(req.body.amount);
 
             if (
                 !Number.isFinite(amount) ||
@@ -573,19 +513,25 @@ app.post(
                 amount > 100000
             ) {
                 return res.status(400).json({
-                    error: 'Valid recharge amount required'
+                    error:
+                        'Valid recharge amount required'
                 });
             }
 
-            if (process.env.NODE_ENV === 'production') {
+            if (
+                process.env.NODE_ENV ===
+                'production'
+            ) {
                 return res.status(503).json({
-                    error: 'Recharge is temporarily unavailable until payment verification is configured.'
+                    error:
+                        'Recharge is temporarily unavailable until payment verification is configured.'
                 });
             }
 
-            const user = await User.findById(
-                req.user.userId
-            );
+            const user =
+                await User.findById(
+                    req.user.userId
+                );
 
             if (!user) {
                 return res.status(404).json({
@@ -594,15 +540,20 @@ app.post(
             }
 
             user.balance = Number(
-                (user.balance + amount).toFixed(2)
+                (
+                    user.balance +
+                    amount
+                ).toFixed(2)
             );
 
             await user.save();
 
             res.json({
                 success: true,
-                message: 'Development recharge successful.',
-                newBalance: user.balance
+                message:
+                    'Development recharge successful.',
+                newBalance:
+                    user.balance
             });
         } catch (error) {
             console.error(
@@ -611,7 +562,8 @@ app.post(
             );
 
             res.status(500).json({
-                error: 'Server error during recharge'
+                error:
+                    'Server error during recharge'
             });
         }
     }
@@ -623,34 +575,44 @@ app.get(
     async (req, res) => {
         try {
             if (
-                req.user.userId !== req.params.userId &&
+                req.user.userId !==
+                    req.params.userId &&
                 !req.user.isAdmin
             ) {
                 return res.status(403).json({
-                    error: 'Unauthorized access'
+                    error:
+                        'Unauthorized access'
                 });
             }
 
-            if (!mongoose.isValidObjectId(req.params.userId)) {
+            if (
+                !mongoose.isValidObjectId(
+                    req.params.userId
+                )
+            ) {
                 return res.status(400).json({
-                    error: 'Invalid user ID'
+                    error:
+                        'Invalid user ID'
                 });
             }
 
-            const user = await User.findById(
-                req.params.userId
-            ).select('-verifiedPhone');
+            const user =
+                await User.findById(
+                    req.params.userId
+                );
 
             if (!user) {
                 return res.status(404).json({
-                    error: 'User not found'
+                    error:
+                        'User not found'
                 });
             }
 
             res.json({
                 balance: user.balance,
                 name: user.name,
-                termsAccepted: user.termsAccepted
+                termsAccepted:
+                    user.termsAccepted
             });
         } catch (error) {
             console.error(
@@ -659,173 +621,8 @@ app.get(
             );
 
             res.status(500).json({
-                error: 'Error fetching balance'
-            });
-        }
-    }
-);
-
-app.post(
-    '/api/send-otp',
-    authenticateToken,
-    otpLimiter,
-    async (req, res) => {
-        try {
-            const phoneNumber = String(
-                req.body.phoneNumber || ''
-            ).trim();
-
-            const userId = req.user.userId;
-
-            if (!validatePhone(phoneNumber)) {
-                return res.status(400).json({
-                    error: 'Kripya sahi 10-digit Indian mobile number enter karein.'
-                });
-            }
-
-            const user = await User.findById(
-                userId
-            ).select('+otpCode +otpExpires +otpAttempts');
-
-            if (!user) {
-                return res.status(404).json({
-                    error: 'User not found'
-                });
-            }
-
-            const otp = crypto
-                .randomInt(100000, 1000000)
-                .toString();
-
-            user.otpCode = otp;
-            user.otpExpires = new Date(
-                Date.now() + 5 * 60 * 1000
-            );
-            user.otpAttempts = 0;
-
-            await user.save();
-
-            if (process.env.NODE_ENV !== 'production') {
-                console.log(
-                    `[DEV OTP] Phone: ${phoneNumber} | OTP: ${otp}`
-                );
-
-                return res.json({
-                    success: true,
-                    message: 'OTP bhej diya gaya hai.',
-                    devOtp: otp
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'OTP aapke number par send ho gaya hai.'
-            });
-        } catch (err) {
-            console.error(
-                'Send OTP error:',
-                err.message
-            );
-
-            res.status(500).json({
-                error: 'OTP bhejne mein error aayi.'
-            });
-        }
-    }
-);
-
-app.post(
-    '/api/verify-otp',
-    authenticateToken,
-    verifyOtpLimiter,
-    async (req, res) => {
-        try {
-            const phoneNumber = String(
-                req.body.phoneNumber || ''
-            ).trim();
-
-            const otp = String(
-                req.body.otp || ''
-            ).trim();
-
-            const userId = req.user.userId;
-
-            if (!validatePhone(phoneNumber)) {
-                return res.status(400).json({
-                    error: 'Invalid phone number format'
-                });
-            }
-
-            if (!/^\d{6}$/.test(otp)) {
-                return res.status(400).json({
-                    error: 'OTP must be 6 digits'
-                });
-            }
-
-            const user = await User.findById(
-                userId
-            ).select('+otpCode +otpExpires +otpAttempts');
-
-            if (!user) {
-                return res.status(404).json({
-                    error: 'User not found'
-                });
-            }
-
-            if ((user.otpAttempts || 0) >= 5) {
-                user.otpCode = null;
-                user.otpExpires = null;
-                user.otpAttempts = 0;
-
-                await user.save();
-
-                return res.status(429).json({
-                    error: 'Too many wrong OTP attempts. Please request a new OTP.'
-                });
-            }
-
-            if (
-                !user.otpCode ||
-                !user.otpExpires ||
-                new Date() > user.otpExpires
-            ) {
-                return res.status(400).json({
-                    error: 'Galat ya expired OTP! Kripya dobara OTP request karein.'
-                });
-            }
-
-            if (user.otpCode !== otp) {
-                user.otpAttempts =
-                    (user.otpAttempts || 0) + 1;
-
-                await user.save();
-
-                return res.status(400).json({
-                    error: 'Galat OTP! Kripya dobara try karein.'
-                });
-            }
-
-            user.verifiedPhone =
-                encryptSensitiveData(phoneNumber);
-
-            user.otpCode = null;
-            user.otpExpires = null;
-            user.otpAttempts = 0;
-
-            await user.save();
-
-            res.json({
-                success: true,
-                message: 'Mobile number successfully verify ho gaya!'
-            });
-        } catch (err) {
-            console.error(
-                'Verify OTP error:',
-                err.message
-            );
-
-            res.status(500).json({
-                error: 'OTP verification mein error aayi.'
+                error:
+                    'Error fetching balance'
             });
         }
     }
@@ -837,68 +634,86 @@ app.post(
     callLimiter,
     async (req, res) => {
         try {
-            const phoneNumber = String(
-                req.body.phoneNumber || ''
-            ).trim();
+            const phoneNumber =
+                String(
+                    req.body.phoneNumber ||
+                    ''
+                ).trim();
+
+            const userPhone =
+                String(
+                    req.body.userPhone ||
+                    ''
+                ).trim();
 
             const maxDuration =
                 req.body.maxDuration;
 
-            const userId = req.user.userId;
+            const userId =
+                req.user.userId;
 
-            if (!validatePhone(phoneNumber)) {
+            if (!validatePhone(userPhone)) {
                 return res.status(400).json({
-                    error: 'Valid phone number required (10 digits)'
+                    error:
+                        'Valid caller phone number required (10 digits)'
                 });
             }
 
-            const user = await User.findById(
-                userId
-            ).select('+verifiedPhone');
+            if (!validatePhone(phoneNumber)) {
+                return res.status(400).json({
+                    error:
+                        'Valid target phone number required (10 digits)'
+                });
+            }
+
+            if (userPhone === phoneNumber) {
+                return res.status(400).json({
+                    error:
+                        'Caller and target numbers cannot be the same.'
+                });
+            }
+
+            const user =
+                await User.findById(
+                    userId
+                );
 
             if (!user) {
                 return res.status(404).json({
-                    error: 'User not found'
+                    error:
+                        'User not found'
                 });
             }
 
             if (!user.termsAccepted) {
                 return res.status(400).json({
-                    error: 'Pehle Terms of Service accept karni hongi.'
-                });
-            }
-
-            if (!user.verifiedPhone) {
-                return res.status(400).json({
-                    error: 'Pehle apna mobile number verify karein.'
-                });
-            }
-
-            const decryptedPhone =
-                decryptSensitiveData(
-                    user.verifiedPhone
-                );
-
-            if (!validatePhone(decryptedPhone)) {
-                return res.status(400).json({
-                    error: 'Verified caller phone number invalid hai.'
+                    error:
+                        'Pehle Terms of Service accept karni hongi.'
                 });
             }
 
             if (
-                !Number.isFinite(user.balance) ||
-                user.balance < ACTUAL_RATE_PER_MINUTE
+                !Number.isFinite(
+                    user.balance
+                ) ||
+                user.balance <
+                    ACTUAL_RATE_PER_MINUTE
             ) {
                 return res.status(400).json({
-                    error: `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
+                    error:
+                        `Wallet balance khatam! Kripya recharge karein (Minimum ₹${ACTUAL_RATE_PER_MINUTE} required).`
                 });
             }
 
-            let maxAllowedMinutes = Math.floor(
-                user.balance / ACTUAL_RATE_PER_MINUTE
-            );
+            let maxAllowedMinutes =
+                Math.floor(
+                    user.balance /
+                    ACTUAL_RATE_PER_MINUTE
+                );
 
-            if (maxAllowedMinutes < 1) {
+            if (
+                maxAllowedMinutes < 1
+            ) {
                 maxAllowedMinutes = 1;
             }
 
@@ -906,21 +721,26 @@ app.post(
                 maxAllowedMinutes;
 
             if (
-                maxDuration !== undefined &&
+                maxDuration !==
+                    undefined &&
                 maxDuration !== null &&
                 maxDuration !== '' &&
-                maxDuration !== 'unlimited'
+                maxDuration !==
+                    'unlimited'
             ) {
                 const requestedMins =
                     Number(maxDuration);
 
                 if (
-                    !Number.isInteger(requestedMins) ||
+                    !Number.isInteger(
+                        requestedMins
+                    ) ||
                     requestedMins < 1 ||
                     requestedMins > 60
                 ) {
                     return res.status(400).json({
-                        error: 'Maximum duration must be between 1 and 60 minutes.'
+                        error:
+                            'Maximum duration must be between 1 and 60 minutes.'
                     });
                 }
 
@@ -931,40 +751,46 @@ app.post(
                     );
             }
 
-            if (!process.env.EDESY_API_KEY) {
+            if (
+                !process.env.EDESY_API_KEY
+            ) {
                 return res.status(500).json({
-                    error: 'Server configuration error: EDESY_API_KEY missing'
+                    error:
+                        'Server configuration error: EDESY_API_KEY missing'
                 });
             }
 
             const formattedPartyA =
-                decryptedPhone.startsWith('91')
-                    ? decryptedPhone
-                    : '91' + decryptedPhone;
+                userPhone.startsWith('91')
+                    ? userPhone
+                    : '91' + userPhone;
 
             const formattedPartyB =
                 phoneNumber.startsWith('91')
                     ? phoneNumber
                     : '91' + phoneNumber;
 
-            const edesyResponse = await fetch(
-                'https://voice-api.edesy.in/v1/masking/calls',
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization:
-                            `Bearer ${process.env.EDESY_API_KEY}`,
-                        'Content-Type':
-                            'application/json'
-                    },
-                    body: JSON.stringify({
-                        party_a: formattedPartyA,
-                        party_b: formattedPartyB,
-                        max_duration:
-                            durationLimitMinutes
-                    })
-                }
-            );
+            const edesyResponse =
+                await fetch(
+                    'https://voice-api.edesy.in/v1/masking/calls',
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization:
+                                `Bearer ${process.env.EDESY_API_KEY}`,
+                            'Content-Type':
+                                'application/json'
+                        },
+                        body: JSON.stringify({
+                            party_a:
+                                formattedPartyA,
+                            party_b:
+                                formattedPartyB,
+                            max_duration:
+                                durationLimitMinutes
+                        })
+                    }
+                );
 
             let edesyData = null;
 
@@ -981,7 +807,8 @@ app.post(
 
                 if (
                     edesyData &&
-                    typeof edesyData === 'object'
+                    typeof edesyData ===
+                        'object'
                 ) {
                     errorMsg =
                         edesyData.message ||
@@ -993,18 +820,6 @@ app.post(
                     error: errorMsg
                 });
             }
-
-            /*
-             * IMPORTANT:
-             * actualDurationSeconds ko client se billing ke liye
-             * trust nahi kiya ja raha.
-             *
-             * Call initiation par minimum 1 minute reserve/charge
-             * kiya ja raha hai.
-             *
-             * Actual call duration ke hisaab se final billing ke liye
-             * Edesy webhook/call-status integration chahiye.
-             */
 
             const billedMinutes = 1;
 
@@ -1025,7 +840,8 @@ app.post(
                     },
                     {
                         $inc: {
-                            balance: -callCost
+                            balance:
+                                -callCost
                         }
                     },
                     {
@@ -1035,7 +851,8 @@ app.post(
 
             if (!updatedUser) {
                 return res.status(400).json({
-                    error: 'Insufficient wallet balance.'
+                    error:
+                        'Insufficient wallet balance.'
                 });
             }
 
@@ -1043,27 +860,35 @@ app.post(
                 getClientIp(req);
 
             const userAgent =
-                req.headers['user-agent'] ||
-                'Unknown';
+                req.headers[
+                    'user-agent'
+                ] || 'Unknown';
 
             try {
                 await CallHistory.create({
                     userId,
-                    callerPhone: decryptedPhone,
-                    targetPhone: phoneNumber,
+                    callerPhone:
+                        userPhone,
+                    targetPhone:
+                        phoneNumber,
                     durationMinutes:
                         billedMinutes,
-                    durationSeconds: 60,
-                    cost: callCost,
+                    durationSeconds:
+                        60,
+                    cost:
+                        callCost,
                     clientIp,
                     userAgent
                 });
-            } catch (historyError) {
+            } catch (
+                historyError
+            ) {
                 await User.findByIdAndUpdate(
                     userId,
                     {
                         $inc: {
-                            balance: callCost
+                            balance:
+                                callCost
                         }
                     }
                 );
@@ -1073,13 +898,16 @@ app.post(
 
             res.json({
                 success: true,
-                message: 'Call initiated successfully!',
+                message:
+                    'Call initiated successfully!',
                 remainingBalance:
                     updatedUser.balance,
                 durationMinutes:
                     billedMinutes,
-                cost: callCost,
-                edesy: edesyData
+                cost:
+                    callCost,
+                edesy:
+                    edesyData
             });
         } catch (error) {
             console.error(
@@ -1088,7 +916,8 @@ app.post(
             );
 
             res.status(500).json({
-                error: 'Server error during call'
+                error:
+                    'Server error during call'
             });
         }
     }
@@ -1100,27 +929,39 @@ app.get(
     async (req, res) => {
         try {
             if (
-                req.user.userId !== req.params.userId &&
+                req.user.userId !==
+                    req.params.userId &&
                 !req.user.isAdmin
             ) {
                 return res.status(403).json({
-                    error: 'Unauthorized access'
+                    error:
+                        'Unauthorized access'
                 });
             }
 
-            if (!mongoose.isValidObjectId(req.params.userId)) {
+            if (
+                !mongoose.isValidObjectId(
+                    req.params.userId
+                )
+            ) {
                 return res.status(400).json({
-                    error: 'Invalid user ID'
+                    error:
+                        'Invalid user ID'
                 });
             }
 
             const history =
                 await CallHistory.find({
-                    userId: req.params.userId
+                    userId:
+                        req.params.userId
                 })
-                    .sort({ date: -1 })
+                    .sort({
+                        date: -1
+                    })
                     .limit(100)
-                    .select('-userAgent');
+                    .select(
+                        '-userAgent'
+                    );
 
             res.json(history);
         } catch (error) {
@@ -1130,7 +971,8 @@ app.get(
             );
 
             res.status(500).json({
-                error: 'Unable to fetch history'
+                error:
+                    'Unable to fetch history'
             });
         }
     }
@@ -1147,7 +989,8 @@ app.delete(
                 )
             ) {
                 return res.status(400).json({
-                    error: 'Invalid history ID'
+                    error:
+                        'Invalid history ID'
                 });
             }
 
@@ -1158,7 +1001,8 @@ app.delete(
 
             if (!history) {
                 return res.status(404).json({
-                    error: 'History record not found'
+                    error:
+                        'History record not found'
                 });
             }
 
@@ -1168,7 +1012,8 @@ app.delete(
                 !req.user.isAdmin
             ) {
                 return res.status(403).json({
-                    error: 'Unauthorized'
+                    error:
+                        'Unauthorized'
                 });
             }
 
@@ -1178,7 +1023,8 @@ app.delete(
 
             res.json({
                 success: true,
-                message: 'History deleted successfully'
+                message:
+                    'History deleted successfully'
             });
         } catch (error) {
             console.error(
@@ -1187,26 +1033,30 @@ app.delete(
             );
 
             res.status(500).json({
-                error: 'Failed to delete history'
+                error:
+                    'Failed to delete history'
             });
         }
     }
 );
 
-app.use((err, req, res, next) => {
-    console.error(
-        'Unhandled error:',
-        err
-    );
+app.use(
+    (err, req, res, next) => {
+        console.error(
+            'Unhandled error:',
+            err
+        );
 
-    if (res.headersSent) {
-        return next(err);
+        if (res.headersSent) {
+            return next(err);
+        }
+
+        res.status(500).json({
+            error:
+                'Internal server error'
+        });
     }
-
-    res.status(500).json({
-        error: 'Internal server error'
-    });
-});
+);
 
 const PORT = Number(
     process.env.PORT || 3000
@@ -1217,7 +1067,9 @@ if (
     PORT < 1 ||
     PORT > 65535
 ) {
-    console.error('Invalid PORT in .env');
+    console.error(
+        'Invalid PORT in .env'
+    );
     process.exit(1);
 }
 
@@ -1228,7 +1080,9 @@ async function migrateDatabase() {
 
         for (const h of histories) {
             let actualSecs =
-                Number(h.durationSeconds || 0);
+                Number(
+                    h.durationSeconds || 0
+                );
 
             if (
                 actualSecs <= 0 &&
@@ -1236,7 +1090,8 @@ async function migrateDatabase() {
             ) {
                 actualSecs =
                     Math.round(
-                        h.durationMinutes * 60
+                        h.durationMinutes *
+                            60
                     );
             }
 
@@ -1246,15 +1101,18 @@ async function migrateDatabase() {
             ) {
                 actualSecs =
                     Math.round(
-                        (h.cost /
-                            ACTUAL_RATE_PER_MINUTE) *
-                        60
+                        (
+                            h.cost /
+                            ACTUAL_RATE_PER_MINUTE
+                        ) * 60
                     );
             }
 
             const billedMinutes =
                 actualSecs > 0
-                    ? Math.ceil(actualSecs / 60)
+                    ? Math.ceil(
+                          actualSecs / 60
+                      )
                     : 1;
 
             const exactCost =
@@ -1267,8 +1125,10 @@ async function migrateDatabase() {
 
             if (
                 h.cost !== exactCost ||
-                h.durationMinutes !== billedMinutes ||
-                h.durationSeconds !== actualSecs
+                h.durationMinutes !==
+                    billedMinutes ||
+                h.durationSeconds !==
+                    actualSecs
             ) {
                 h.durationMinutes =
                     billedMinutes;
@@ -1288,7 +1148,8 @@ async function migrateDatabase() {
 
         for (const user of users) {
             if (
-                user.minutes !== undefined &&
+                user.minutes !==
+                    undefined &&
                 user.minutes > 0 &&
                 user.balance === 0
             ) {
@@ -1300,7 +1161,8 @@ async function migrateDatabase() {
                         ).toFixed(2)
                     );
 
-                user.minutes = undefined;
+                user.minutes =
+                    undefined;
 
                 await user.save();
             }
