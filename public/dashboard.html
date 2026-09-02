@@ -19,6 +19,7 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; user-select: none; }
         tr.history-row { cursor: pointer; transition: background 0.2s; }
         tr.history-row:hover { background: #f1f3f5; }
+        .gst-text { font-size: 12px; color: #d9534f; margin-top: -3px; margin-bottom: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,20 +36,22 @@
             <div class="section" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h3 id="welcome-msg" style="margin: 0;">Hello, User</h3>
-                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes <span style="font-size: 11px; color: #28a745;">(1 Free Minute)</span></p>
+                    <p style="margin: 5px 0 0 0;"><strong>Balance:</strong> <span id="minutes-count">0</span> Minutes <span style="font-size: 11px; color: #28a745;">(Rate: ₹3/min)</span></p>
                 </div>
                 <button onclick="logout()" style="width: auto; background: #dc3545; padding: 6px 12px; font-size: 12px;">Logout</button>
             </div>
 
-            <!-- PhonePe Recharge Section -->
+            <!-- PhonePe Recharge Section with GST -->
             <div class="section">
                 <h3>Recharge via PhonePe (UPI)</h3>
                 <div class="hint-box">
                     <strong>📱 Steps to Recharge:</strong><br>
-                    1. Pay via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
-                    2. UTR daalne ke baad recharge Pending rahega. Admin approval ke baad minutes mil jayenge.
+                    1. Min amount: <b>₹2</b> (Rate: ₹3/min). 18% GST will be added.<br>
+                    2. Pay the total amount via PhonePe to UPI ID: <b>your-upi@ybl</b><br>
+                    3. Enter amount and UTR below. Admin approval ke baad minutes mil jayenge.
                 </div>
-                <input type="number" id="recharge-amount" placeholder="Enter amount paid in ₹ (Min ₹10)" min="10">
+                <input type="number" id="recharge-amount" placeholder="Enter base amount in ₹ (Min ₹2)" min="2" oninput="calculateGst()">
+                <div id="gst-display" class="gst-text">Total to Pay (inc. 18% GST): ₹0.00</div>
                 <input type="text" id="txn-id" placeholder="Enter PhonePe Transaction ID / UTR">
                 <button onclick="requestRecharge()" style="background: #5f259f; color: #fff;">Submit Recharge Request</button>
             </div>
@@ -141,12 +144,24 @@
             } catch (err) { console.error(err); }
         }
 
+        function calculateGst() {
+            const baseAmount = Number(document.getElementById('recharge-amount').value);
+            if (!baseAmount || baseAmount <= 0) {
+                document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
+                return;
+            }
+            const gst = baseAmount * 0.18;
+            const total = baseAmount + gst;
+            const estimatedMinutes = (baseAmount / 3.00).toFixed(2);
+            document.getElementById('gst-display').innerText = `Total to Pay: ₹${total.toFixed(2)} (Base: ₹${baseAmount} + GST: ₹${gst.toFixed(2)}) ➔ You will get ~${estimatedMinutes} Minutes`;
+        }
+
         async function requestRecharge() {
-            const amountPaid = Number(document.getElementById('recharge-amount').value);
+            const baseAmount = Number(document.getElementById('recharge-amount').value);
             const txnId = document.getElementById('txn-id').value.trim();
 
-            if (!amountPaid || amountPaid < 10 || !txnId) {
-                alert('Please enter a valid amount (min ₹10) and Transaction ID.');
+            if (!baseAmount || baseAmount < 2 || !txnId) {
+                alert('Please enter a valid amount (min ₹2) and Transaction ID.');
                 return;
             }
 
@@ -154,13 +169,14 @@
                 const res = await fetch('/api/recharge-request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, amountPaid, txnId })
+                    body: JSON.stringify({ userId, baseAmount, txnId })
                 });
                 const data = await res.json();
                 if (res.ok) {
                     alert(data.message);
                     document.getElementById('recharge-amount').value = '';
                     document.getElementById('txn-id').value = '';
+                    document.getElementById('gst-display').innerText = 'Total to Pay (inc. 18% GST): ₹0.00';
                 } else { alert(data.error); }
             } catch (err) { alert('Recharge request failed.'); }
         }
@@ -221,19 +237,16 @@
                         <td>${new Date(item.date).toLocaleDateString()}</td>
                     `;
 
-                    // Tap and Hold (Long Press) Logic for Deleting History
                     let pressTimer;
                     const startPress = () => {
                         pressTimer = setTimeout(async () => {
                             if (confirm(`Kya aap ${item.phoneNumber} ki is history ko delete karna chahte hain?`)) {
                                 await deleteHistory(item._id);
                             }
-                        }, 600); // 600ms hold time
+                        }, 600);
                     };
 
-                    const cancelPress = () => {
-                        clearTimeout(pressTimer);
-                    };
+                    const cancelPress = () => { clearTimeout(pressTimer); };
 
                     tr.addEventListener('mousedown', startPress);
                     tr.addEventListener('mouseup', cancelPress);
@@ -249,11 +262,10 @@
         async function deleteHistory(historyId) {
             try {
                 const res = await fetch(`/api/history/${historyId}`, { method: 'DELETE' });
-                const data = await res.json();
                 if (res.ok) {
-                    loadHistory(); // Reload history list
+                    loadHistory();
                 } else {
-                    alert(data.error || 'Failed to delete history');
+                    alert('Failed to delete history');
                 }
             } catch (err) {
                 alert('Error deleting history');

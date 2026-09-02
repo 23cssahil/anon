@@ -17,14 +17,16 @@ const userSchema = new mongoose.Schema({
     googleId: String,
     email: String,
     name: String,
-    minutes: { type: Number, default: 1 } 
+    minutes: { type: Number, default: 1 } // 1 Free Minute on Signup
 });
 const User = mongoose.model('User', userSchema);
 
 const transactionSchema = new mongoose.Schema({
     txnId: { type: String, unique: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    amount: Number,
+    baseAmount: Number,
+    gstAmount: Number,
+    totalPaid: Number,
     status: { type: String, default: 'Pending' },
     date: { type: Date, default: Date.now }
 });
@@ -63,11 +65,12 @@ app.get('/api/balance/:userId', async (req, res) => {
     }
 });
 
+// Recharge Request with 18% GST and ₹3/min rate
 app.post('/api/recharge-request', async (req, res) => {
-    const { userId, amountPaid, txnId } = req.body;
+    const { userId, baseAmount, txnId } = req.body;
     try {
-        if (!amountPaid || amountPaid < 10) {
-            return res.status(400).json({ error: 'Minimum recharge amount is ₹10.' });
+        if (!baseAmount || baseAmount < 2) {
+            return res.status(400).json({ error: 'Minimum recharge amount is ₹2.' });
         }
         if (!txnId || txnId.trim().length < 10) {
             return res.status(400).json({ error: 'Kripya sahi PhonePe Transaction ID (UTR) dalein.' });
@@ -79,8 +82,23 @@ app.post('/api/recharge-request', async (req, res) => {
             return res.status(400).json({ error: 'Yeh Transaction ID pehle hi use ki ja chuki hai!' });
         }
 
-        await Transaction.create({ txnId: cleanTxnId, userId, amount: amountPaid, status: 'Pending' });
-        res.json({ success: true, message: 'Recharge request submitted! Admin approval ke baad minutes add honge.' });
+        // Calculate 18% GST
+        const gstAmount = Number((baseAmount * 0.18).toFixed(2));
+        const totalPaid = Number((baseAmount + gstAmount).toFixed(2));
+
+        await Transaction.create({
+            txnId: cleanTxnId,
+            userId,
+            baseAmount,
+            gstAmount,
+            totalPaid,
+            status: 'Pending'
+        });
+
+        res.json({ 
+            success: true, 
+            message: `Recharge request submitted! Base: ₹${baseAmount} + GST(18%): ₹${gstAmount} = Total: ₹${totalPaid}. Admin approval ke baad minutes mil jayenge.` 
+        });
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: 'Yeh Transaction ID pehle hi use ho chuki hai!' });
@@ -89,6 +107,7 @@ app.post('/api/recharge-request', async (req, res) => {
     }
 });
 
+// Admin Approval Route (Calculates minutes at ₹3 per minute based on baseAmount)
 app.get('/api/admin/approve/:txnId', async (req, res) => {
     try {
         const txn = await Transaction.findOne({ txnId: req.params.txnId });
@@ -98,8 +117,9 @@ app.get('/api/admin/approve/:txnId', async (req, res) => {
         const user = await User.findById(txn.userId);
         if (!user) return res.status(404).send('User not found');
 
-        const ratePerMinute = 2.50;
-        const minutesToAdd = Number((txn.amount / ratePerMinute).toFixed(2));
+        // Rate: ₹3.00 per minute
+        const ratePerMinute = 3.00;
+        const minutesToAdd = Number((txn.baseAmount / ratePerMinute).toFixed(2));
 
         user.minutes += minutesToAdd;
         await user.save();
@@ -107,12 +127,13 @@ app.get('/api/admin/approve/:txnId', async (req, res) => {
         txn.status = 'Approved';
         await txn.save();
 
-        res.send(`<h1>Success! ${minutesToAdd} minutes added to user account. You can close this tab.</h1>`);
+        res.send(`<h1>Success! ${minutesToAdd} minutes added to user account (Based on ₹${txn.baseAmount} @ ₹3/min). You can close this tab.</h1>`);
     } catch (err) {
         res.status(500).send('Error approving transaction');
     }
 });
 
+// Call Route (Uses ₹3 per minute cost deduction calculation)
 app.post('/api/call', async (req, res) => {
     const { userId, userPhone, phoneNumber, maxDuration } = req.body;
     
@@ -121,7 +142,7 @@ app.post('/api/call', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         if (user.minutes < 1) {
-            return res.status(400).json({ error: 'Aapka balance khatam ho chuka hai! Kripya recharge karein.' });
+            return res.status(400).json({ error: 'Aapka 1 free minute aur balance khatam ho chuka hai! Kripya recharge karein.' });
         }
 
         let durationLimit = 1.0;
@@ -157,7 +178,7 @@ app.post('/api/call', async (req, res) => {
             return res.status(400).json({ error: edesyData.message || 'Edesy API failed.' });
         }
 
-        const callCost = Number((durationLimit * 2.50).toFixed(2));
+        const callCost = Number((durationLimit * 3.00).toFixed(2)); // ₹3 per min cost calculation
 
         user.minutes -= durationLimit;
         await user.save();
@@ -191,7 +212,6 @@ app.get('/api/history/:userId', async (req, res) => {
     }
 });
 
-// Delete History Endpoint
 app.delete('/api/history/:historyId', async (req, res) => {
     try {
         await CallHistory.findByIdAndDelete(req.params.historyId);
