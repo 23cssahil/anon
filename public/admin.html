@@ -3,81 +3,346 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Pending Recharges</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Admin Portal — Recharge Verification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary: #7c3aed;
+            --primary-dark: #5b21b6;
+            --primary-light: #a78bfa;
             --accent: #06b6d4;
+            --accent-dark: #0891b2;
             --success: #10b981;
+            --warning: #f59e0b;
             --danger: #ef4444;
             --bg-dark: #0f0c29;
-            --glass: rgba(255,255,255,0.08);
-            --card-bg: rgba(255,255,255,0.95);
+            --card-dark: rgba(22, 18, 48, 0.75);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
             font-family: 'Outfit', sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background: linear-gradient(135deg, #0f0c29 0%, #1a153d 50%, #241c4a 100%);
             min-height: 100vh;
-            color: #fff;
-            margin: 0;
-            padding: 40px 20px;
+            color: #f8fafc;
+            padding: 30px 20px;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1020px;
             margin: 0 auto;
         }
 
-        .header {
+        /* ── Top Bar ── */
+        .topbar {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 30px;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 16px;
         }
 
-        .header-icon {
-            width: 48px;
-            height: 48px;
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 46px;
+            height: 46px;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
         }
 
-        .header h1 {
-            font-size: 28px;
+        .brand-title h1 {
+            font-size: 24px;
             font-weight: 700;
-            margin: 0;
+            letter-spacing: -0.5px;
         }
 
-        .card {
-            background: var(--card-bg);
+        .brand-title p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-top {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            color: #f8fafc;
+            padding: 9px 16px;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-top:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        /* ── Password Gate Modal / Card ── */
+        .password-gate {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60vh;
+        }
+
+        .login-card {
+            background: var(--card-dark);
+            border: 1px solid var(--border-glass);
             border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-            color: #1e1b4b;
+            padding: 36px;
+            width: 100%;
+            max-width: 440px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
         }
 
-        .status-box {
-            background: #eff6ff;
-            border-left: 4px solid var(--accent);
-            padding: 15px 20px;
-            border-radius: 0 10px 10px 0;
+        .lock-icon-wrap {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(124, 58, 237, 0.15);
+            border: 1px solid rgba(124, 58, 237, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: var(--primary-light);
+            margin: 0 auto 20px;
+        }
+
+        .login-card h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .login-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            background: rgba(15, 12, 41, 0.8);
+            border: 1.5px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 13px 44px 13px 16px;
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
             font-size: 15px;
-            color: #1e40af;
-            margin-bottom: 25px;
-            font-weight: 500;
+            outline: none;
+            transition: all 0.2s ease;
         }
 
-        .error-box {
-            background: #fef2f2;
-            border-left: 4px solid var(--danger);
-            color: #991b1b;
+        .input-wrapper input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .toggle-password:hover {
+            color: #fff;
+        }
+
+        .btn-unlock {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border: none;
+            border-radius: 12px;
+            padding: 13px;
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+        }
+
+        .btn-unlock:hover {
+            opacity: 0.94;
+            transform: translateY(-1px);
+        }
+
+        .gate-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        /* ── Main Dashboard View ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card-dark);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(16px);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .stat-pending-icon {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .stat-amount-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .stat-info .stat-value {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-info .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* ── Table Card ── */
+        .table-card {
+            background: var(--card-dark);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .table-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .table-header-row h2 {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .table-badge {
+            background: rgba(124, 58, 237, 0.2);
+            color: var(--primary-light);
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid rgba(124, 58, 237, 0.3);
+        }
+
+        .table-responsive {
+            overflow-x: auto;
         }
 
         table {
@@ -86,224 +351,580 @@
             font-size: 14px;
         }
 
-        th, td {
-            padding: 15px;
+        thead th {
             text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        th {
-            background: #f8fafc;
+            padding: 12px 14px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-glass);
             font-weight: 600;
-            color: #475569;
         }
 
-        .user-name { font-weight: 600; color: #1e293b; }
-        .user-email { font-size: 12px; color: #64748b; }
-        .utr-badge { background: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-family: monospace; font-size: 13px;}
-        .amount-badge { font-weight: 700; color: #059669; }
+        tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            transition: background 0.15s ease;
+        }
 
-        .btn {
-            padding: 8px 16px;
-            border: none;
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        tbody td {
+            padding: 16px 14px;
+            vertical-align: middle;
+        }
+
+        .user-col .name {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .user-col .email {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .amount-tag {
+            font-size: 17px;
+            font-weight: 800;
+            color: #34d399;
+            display: inline-block;
+        }
+
+        .utr-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(124, 58, 237, 0.15);
+            border: 1px solid rgba(124, 58, 237, 0.35);
+            color: #c4b5fd;
+            padding: 6px 12px;
             border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .btn-copy {
+            background: none;
+            border: none;
+            color: #a78bfa;
             cursor: pointer;
+            font-size: 12px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: color 0.15s;
+        }
+
+        .btn-copy:hover {
+            color: #fff;
+        }
+
+        .date-text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .actions-col {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-action {
+            padding: 8px 14px;
+            border-radius: 8px;
             font-family: 'Outfit', sans-serif;
-            font-weight: 600;
             font-size: 13px;
-            transition: 0.2s;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            transition: all 0.15s ease;
         }
 
-        .btn-approve { background: var(--success); color: white; }
-        .btn-approve:hover { background: #059669; }
-        
-        .btn-reject { background: #f1f5f9; color: #475569; margin-left: 5px; }
-        .btn-reject:hover { background: #e2e8f0; color: var(--danger); }
+        .btn-approve {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        }
 
+        .btn-approve:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+        }
+
+        .btn-reject {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+        }
+
+        .btn-reject:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fff;
+        }
+
+        /* ── Empty State ── */
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
-            color: #64748b;
+            padding: 48px 20px;
+            color: var(--text-muted);
         }
-        
-        .empty-state i { font-size: 48px; color: #cbd5e1; margin-bottom: 15px; }
 
-        .dashboard-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #fff;
-            text-decoration: none;
-            background: var(--glass);
-            padding: 10px 20px;
-            border-radius: 50px;
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: 0.2s;
+        .empty-state-icon {
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #64748b;
+            margin: 0 auto 16px;
         }
-        
-        .dashboard-link:hover {
-            background: rgba(255,255,255,0.15);
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+        }
+
+        /* ── Toast Message ── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e1b4b;
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 14px 20px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--danger);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <div class="header">
-            <div class="header-icon"><i class="fas fa-shield-alt"></i></div>
-            <h1>Admin Panel</h1>
-        </div>
-
-        <div class="card">
-            <div id="status-box" class="status-box">
-                <i class="fas fa-spinner fa-spin"></i> Loading pending requests...
+        <!-- ── Top Header ── -->
+        <div class="topbar">
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="brand-title">
+                    <h1>Admin Control Center</h1>
+                    <p>Recharge Request & UTR Verification Portal</p>
+                </div>
             </div>
-
-            <div style="overflow-x: auto;">
-                <table id="requests-table" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>User Details</th>
-                            <th>Amount Paid</th>
-                            <th>UTR / Reference No.</th>
-                            <th>Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="requests-body">
-                    </tbody>
-                </table>
+            <div class="topbar-actions" id="topbar-actions" style="display: none;">
+                <button class="btn-top" onclick="loadRequests()">
+                    <i class="fas fa-sync-alt" id="refresh-icon"></i> Refresh
+                </button>
+                <button class="btn-top" onclick="lockAdmin()">
+                    <i class="fas fa-lock"></i> Lock
+                </button>
+                <a href="/" class="btn-top">
+                    <i class="fas fa-arrow-left"></i> Main Site
+                </a>
             </div>
         </div>
 
-        <div style="text-align: center;">
-            <a href="/" class="dashboard-link"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        <!-- ── 1. Password Gate View ── -->
+        <div id="password-gate-view" class="password-gate">
+            <div class="login-card">
+                <div class="lock-icon-wrap">
+                    <i class="fas fa-key"></i>
+                </div>
+                <h2>Admin Verification</h2>
+                <p>Enter the master admin password configured in your <code>.env</code> file to unlock access.</p>
+
+                <div id="gate-error" class="gate-error"></div>
+
+                <form onsubmit="handleUnlock(event)">
+                    <div class="input-group">
+                        <label for="admin-password-input">Master Password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="admin-password-input" placeholder="Enter ADMIN_PASSWORD" required autofocus>
+                            <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility()"></i>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-unlock" id="unlock-btn">
+                        <i class="fas fa-unlock"></i> Unlock Dashboard
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── 2. Dashboard View ── -->
+        <div id="dashboard-view" style="display: none;">
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon stat-pending-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="stat-pending-count">0</div>
+                        <div class="stat-label">Pending Requests</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon stat-amount-icon">
+                        <i class="fas fa-rupee-sign"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-value">₹<span id="stat-pending-total">0.00</span></div>
+                        <div class="stat-label">Total Value Pending</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="table-card">
+                <div class="table-header-row">
+                    <h2>
+                        <i class="fas fa-list-ul" style="color: var(--accent);"></i>
+                        Pending Verification Queue
+                        <span class="table-badge" id="queue-badge">0 Pending</span>
+                    </h2>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Amount</th>
+                                <th>UTR / Reference No.</th>
+                                <th>Date & Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script>
-        const token = localStorage.getItem('userToken');
-        const statusBox = document.getElementById('status-box');
-        const reqTable = document.getElementById('requests-table');
-        const tbody = document.getElementById('requests-body');
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-check-circle" id="toast-icon"></i>
+        <span id="toast-msg">Success</span>
+    </div>
 
-        if (!token) {
-            showError('Aap logged in nahi hain. Pehle dashboard par jakar admin id se login karein.');
-        } else {
-            loadRequests();
+    <script>
+        const STORAGE_KEY = 'anon_admin_pass';
+
+        // Check if admin password is already saved in session
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedPassword = sessionStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY);
+            if (savedPassword) {
+                verifyAndProceed(savedPassword);
+            }
+        });
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('admin-password-input');
+            const icon = document.querySelector('.toggle-password');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
         }
 
-        function showError(msg) {
-            statusBox.className = 'status-box error-box';
-            statusBox.innerHTML = `<i class="fas fa-exclamation-circle"></i> <strong>Access Denied:</strong><br><br>${msg}`;
-            reqTable.style.display = 'none';
+        async function handleUnlock(event) {
+            event.preventDefault();
+            const password = document.getElementById('admin-password-input').value.trim();
+            if (!password) return;
+
+            const btn = document.getElementById('unlock-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+
+            await verifyAndProceed(password);
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-unlock"></i> Unlock Dashboard';
+        }
+
+        async function verifyAndProceed(password) {
+            const errorDiv = document.getElementById('gate-error');
+            errorDiv.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/admin/verify-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.success) {
+                    sessionStorage.setItem(STORAGE_KEY, password);
+                    localStorage.setItem(STORAGE_KEY, password);
+                    showDashboard();
+                    loadRequests();
+                } else {
+                    errorDiv.innerText = data.error || 'Incorrect Admin Password. Check ADMIN_PASSWORD in .env';
+                    errorDiv.style.display = 'block';
+                    sessionStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Network error: could not connect to server.';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('password-gate-view').style.display = 'none';
+            document.getElementById('dashboard-view').style.display = 'block';
+            document.getElementById('topbar-actions').style.display = 'flex';
+        }
+
+        function lockAdmin() {
+            sessionStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_KEY);
+            document.getElementById('password-gate-view').style.display = 'flex';
+            document.getElementById('dashboard-view').style.display = 'none';
+            document.getElementById('topbar-actions').style.display = 'none';
+            document.getElementById('admin-password-input').value = '';
+            showToast('Admin locked successfully', 'success');
+        }
+
+        function getAuthHeaders() {
+            const pwd = sessionStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY) || '';
+            const userToken = localStorage.getItem('userToken');
+            const headers = {
+                'x-admin-password': pwd
+            };
+            if (userToken) {
+                headers['Authorization'] = `Bearer ${userToken}`;
+            }
+            return headers;
         }
 
         async function loadRequests() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
             try {
                 const res = await fetch('/api/admin/recharges', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
-                
-                const data = await res.json().catch(()=>({}));
 
-                if (res.status === 403) {
-                    showError(data.error || 'Aapki email admin email nahi hai. server.js me adminEmails array check karein.');
+                if (res.status === 401 || res.status === 403) {
+                    showToast('Session expired or invalid password', 'error');
+                    lockAdmin();
                     return;
                 }
 
-                if (!res.ok) {
-                    showError('Error loading data: ' + (data.error || 'Server error'));
-                    return;
-                }
+                const data = await res.json();
+                const tbody = document.getElementById('queue-tbody');
+                tbody.innerHTML = '';
 
                 if (!Array.isArray(data) || data.length === 0) {
-                    statusBox.className = 'status-box';
-                    statusBox.innerHTML = '<i class="fas fa-check-circle"></i> Koi pending requests nahi hain.';
-                    
-                    reqTable.style.display = 'table';
-                    tbody.innerHTML = `<tr><td colspan="5">
-                        <div class="empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <h3>All Caught Up!</h3>
-                            <p>No users are waiting for balance approval.</p>
-                        </div>
-                    </td></tr>`;
+                    document.getElementById('stat-pending-count').innerText = '0';
+                    document.getElementById('stat-pending-total').innerText = '0.00';
+                    document.getElementById('queue-badge').innerText = '0 Pending';
+
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-check-circle" style="color: var(--success);"></i>
+                                    </div>
+                                    <h3>Queue is Clean!</h3>
+                                    <p>There are currently no pending recharge requests from users.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
                     return;
                 }
 
-                statusBox.className = 'status-box';
-                statusBox.innerHTML = `<i class="fas fa-list"></i> <strong>${data.length} Pending Request(s)</strong> found. Verify in your bank app before approving.`;
-                reqTable.style.display = 'table';
-                tbody.innerHTML = '';
+                // Update Stats
+                const totalAmount = data.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                document.getElementById('stat-pending-count').innerText = data.length;
+                document.getElementById('stat-pending-total').innerText = totalAmount.toFixed(2);
+                document.getElementById('queue-badge').innerText = `${data.length} Pending`;
 
                 data.forEach(req => {
                     const tr = document.createElement('tr');
-                    const date = new Date(req.createdAt).toLocaleString();
-                    const name = req.userId ? req.userId.name : 'Unknown';
-                    const email = req.userId ? req.userId.email : 'Unknown';
-                    
+                    const date = new Date(req.createdAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    const name = req.userId ? req.userId.name : 'Unknown User';
+                    const email = req.userId ? req.userId.email : 'No email';
+
                     tr.innerHTML = `
-                        <td>
-                            <div class="user-name">${name}</div>
-                            <div class="user-email">${email}</div>
+                        <td class="user-col">
+                            <div class="name">${escapeHtml(name)}</div>
+                            <div class="email">${escapeHtml(email)}</div>
                         </td>
-                        <td class="amount-badge">₹${req.amount.toFixed(2)}</td>
-                        <td><span class="utr-badge">${req.utr}</span></td>
-                        <td><div style="font-size:12px;color:#64748b;">${date}</div></td>
                         <td>
-                            <button class="btn btn-approve" onclick="approveReq('${req._id}', ${req.amount})">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                            <button class="btn btn-reject" onclick="rejectReq('${req._id}')">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <span class="amount-tag">₹${Number(req.amount).toFixed(2)}</span>
+                        </td>
+                        <td>
+                            <div class="utr-chip">
+                                <span>${escapeHtml(req.utr)}</span>
+                                <button class="btn-copy" onclick="copyUtr('${escapeHtml(req.utr)}')" title="Copy UTR">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date-text">${date}</span>
+                        </td>
+                        <td>
+                            <div class="actions-col">
+                                <button class="btn-action btn-approve" onclick="approveRequest('${req._id}', ${req.amount})">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                                <button class="btn-action btn-reject" onclick="rejectRequest('${req._id}')">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
                 });
+
             } catch (err) {
-                showError('Network error connecting to server.');
+                showToast('Failed to load queue: ' + err.message, 'error');
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
             }
         }
 
-        async function approveReq(id, amount) {
-            if (!confirm(`Are you sure you want to APPROVE this recharge?\n\nUser will instantly get ₹${amount} in their wallet.`)) return;
+        async function approveRequest(id, amount) {
+            if (!confirm(`Are you sure you want to APPROVE this recharge?\n\n₹${amount} will be instantly credited to the user's wallet.`)) {
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/admin/recharges/${id}/approve`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
-                const data = await res.json();
-                if (data.success) {
-                    alert('✅ Approved successfully. Balance added.');
+
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    showToast(`₹${amount} approved & credited successfully!`, 'success');
                     loadRequests();
                 } else {
-                    alert('❌ Error: ' + data.error);
+                    showToast(data.error || 'Failed to approve request', 'error');
                 }
             } catch (err) {
-                alert('Network error');
+                showToast('Network error during approval', 'error');
             }
         }
 
-        async function rejectReq(id) {
-            if (!confirm('Are you sure you want to REJECT this UTR request? (Use this for fake UTRs)')) return;
+        async function rejectRequest(id) {
+            if (!confirm('Are you sure you want to REJECT this UTR request? (Use this for fake or unreceived UTRs)')) {
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/admin/recharges/${id}/reject`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: getAuthHeaders()
                 });
-                const data = await res.json();
-                if (data.success) {
-                    alert('🗑️ Request rejected.');
+
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    showToast('Request rejected successfully', 'success');
                     loadRequests();
                 } else {
-                    alert('❌ Error: ' + data.error);
+                    showToast(data.error || 'Failed to reject request', 'error');
                 }
             } catch (err) {
-                alert('Network error');
+                showToast('Network error during reject', 'error');
             }
+        }
+
+        function copyUtr(utr) {
+            navigator.clipboard.writeText(utr).then(() => {
+                showToast('UTR copied: ' + utr, 'success');
+            }).catch(() => {
+                showToast('Could not copy', 'error');
+            });
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            const icon = document.getElementById('toast-icon');
+
+            msgEl.innerText = msg;
+            toast.className = `toast ${type === 'success' ? 'toast-success' : 'toast-error'} show`;
+            icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[m]));
         }
     </script>
 </body>

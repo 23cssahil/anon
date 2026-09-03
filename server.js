@@ -150,18 +150,41 @@ const authenticateToken = (req, res, next) => {
     );
 };
 
-const isAdmin = async (req, res, next) => {
+const adminAuth = (req, res, next) => {
     try {
-        const adminEmails = ['23cssahil@gmail.com'];
-        if (adminEmails.includes(req.user.email)) {
-            next();
-        } else {
-            return res.status(403).json({ error: `Admin access required. Your email is: ${req.user.email}` });
+        const providedPass = req.headers['x-admin-password'] || req.query.adminPassword;
+        const adminPassword = process.env.ADMIN_PASSWORD || 'sahil@admin2026';
+
+        // 1. Password-based access (from .env)
+        if (providedPass && providedPass === adminPassword) {
+            return next();
         }
+
+        // 2. Token-based email fallback
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const adminEmails = ['23cssahil@gmail.com', 'username47397@gmail.com'];
+                if (decoded && decoded.email && adminEmails.includes(decoded.email.toLowerCase())) {
+                    req.user = decoded;
+                    return next();
+                }
+            } catch (e) {
+                // Token invalid or expired
+            }
+        }
+
+        return res.status(401).json({
+            error: 'Admin authorization failed. Invalid admin password or unauthorized email.'
+        });
     } catch (err) {
         return res.status(500).json({ error: 'Admin check failed' });
     }
 };
+
+const isAdmin = adminAuth;
 
 function validatePhone(phone) {
     return typeof phone === 'string' &&
@@ -790,7 +813,16 @@ app.get('/api/user/recharges', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/admin/recharges', authenticateToken, isAdmin, async (req, res) => {
+app.post('/api/admin/verify-password', (req, res) => {
+    const { password } = req.body || {};
+    const adminPassword = process.env.ADMIN_PASSWORD || 'sahil@admin2026';
+    if (password && password === adminPassword) {
+        return res.json({ success: true, message: 'Password verified successfully' });
+    }
+    return res.status(401).json({ success: false, error: 'Incorrect Admin Password' });
+});
+
+app.get('/api/admin/recharges', adminAuth, async (req, res) => {
     try {
         const requests = await RechargeRequest.find({ status: 'pending' })
             .populate('userId', 'name email')
@@ -801,7 +833,7 @@ app.get('/api/admin/recharges', authenticateToken, isAdmin, async (req, res) => 
     }
 });
 
-app.post('/api/admin/recharges/:id/approve', authenticateToken, isAdmin, async (req, res) => {
+app.post('/api/admin/recharges/:id/approve', adminAuth, async (req, res) => {
     try {
         const reqDoc = await RechargeRequest.findById(req.params.id);
         if (!reqDoc || reqDoc.status !== 'pending') {
@@ -823,7 +855,7 @@ app.post('/api/admin/recharges/:id/approve', authenticateToken, isAdmin, async (
     }
 });
 
-app.post('/api/admin/recharges/:id/reject', authenticateToken, isAdmin, async (req, res) => {
+app.post('/api/admin/recharges/:id/reject', adminAuth, async (req, res) => {
     try {
         const reqDoc = await RechargeRequest.findById(req.params.id);
         if (!reqDoc || reqDoc.status !== 'pending') {
