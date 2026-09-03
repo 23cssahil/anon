@@ -897,6 +897,9 @@
                             <span>₹3/min (18% GST incl.)</span>
                         </div>
                     </div>
+                    <button class="dropdown-logout-btn" style="background: rgba(124,58,237,0.15); border-color: rgba(124,58,237,0.3); color: #a78bfa; margin-bottom: 8px;" onclick="closeDropdown(); openRechargeHistory();">
+                        <i class="fas fa-history"></i> Recharge History
+                    </button>
                     <button class="dropdown-logout-btn" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Sign Out
                     </button>
@@ -996,9 +999,6 @@
                     <div class="balance-mini-label">Wallet Balance</div>
                     <div class="balance-mini-amount">₹<span id="balance-amount">0.00</span></div>
                     <div class="balance-mini-rate">₹3.00/min</div>
-                    <button class="btn btn-primary" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; width: auto; margin-left: auto;" onclick="openRechargeHistory()">
-                        <i class="fas fa-history"></i> History
-                    </button>
                 </div>
             </div>
 
@@ -1481,12 +1481,35 @@
             const utr = document.getElementById('recharge-utr').value.trim();
             
             if (amount < 3 || !Number.isFinite(amount)) {
-                showAlert('Enter a valid amount (minimum ₹3).', '⚠️');
+                showAlert('Enter a valid talktime amount (minimum ₹3).', '⚠️');
                 return;
             }
             if (utr.length < 12) {
                 showAlert('Please enter a valid 12-digit UTR or Reference number from your payment app.', '⚠️');
                 return;
+            }
+
+            // ── Edesy Pool Check: make sure enough Edesy balance exists ──
+            try {
+                const poolRes = await fetch('/api/pool-status');
+                if (poolRes.ok) {
+                    const poolData = await poolRes.json();
+                    // edesyTotalRupees is Edesy balance × COMMISSION (₹1.50/min)
+                    // User talktime of ₹X needs Edesy ₹(X × 0.5) i.e. X/2
+                    const edesyAvailable = poolData.edesyTotalRupees || 0;
+                    const edesyNeeded = amount * 0.5; // each ₹1 user talktime costs ₹0.50 on Edesy
+                    if (edesyNeeded > edesyAvailable) {
+                        const maxUserTalktime = Math.floor(edesyAvailable * 2);
+                        showAlert(
+                            `❌ Abhi itna bada recharge available nahi hai.\n\n` +
+                            `Edesy account balance kam hai. Abhi maximum ₹${maxUserTalktime} tak ka recharge karo.`,
+                            '❌'
+                        );
+                        return;
+                    }
+                }
+            } catch (poolErr) {
+                console.warn('Pool check failed, allowing recharge:', poolErr);
             }
 
             const totalToPay = amount * 1.18;
