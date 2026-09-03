@@ -857,6 +857,39 @@ app.get(
     }
 );
 
+app.get(
+    '/api/user/profile',
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const user = await User.findById(req.user.userId);
+
+            if (!user) {
+                return res.status(404).json({
+                    error: 'User not found'
+                });
+            }
+
+            res.json({
+                success: true,
+                user: {
+                    userId: user._id.toString(),
+                    name: user.name,
+                    email: user.email,
+                    balance: roundMoney(user.balance),
+                    termsAccepted: user.termsAccepted,
+                    memberSince: user.createdAt
+                }
+            });
+        } catch (error) {
+            console.error('Profile fetch error:', error.message);
+            res.status(500).json({
+                error: 'Error fetching profile'
+            });
+        }
+    }
+);
+
 app.post(
     '/api/call',
     authenticateToken,
@@ -1039,7 +1072,12 @@ app.post(
                                     party_a:
                                         userPhone,
                                     party_b:
-                                        phoneNumber
+                                        phoneNumber,
+                                    // CRITICAL FIX: Pass max_duration so Edesy auto-disconnects
+                                    // the call after durationLimitMinutes. Without this, calls
+                                    // ran forever regardless of user's selected limit.
+                                    max_duration:
+                                        durationLimitMinutes
                                 })
                         }
                     );
@@ -1392,7 +1430,11 @@ function verifyEdesyWebhook(req) {
     const secret =
         process.env.EDESY_WEBHOOK_SECRET;
 
+    // In non-production (dev/staging), allow webhooks without secret for testing
     if (!secret) {
+        if (process.env.NODE_ENV !== 'production') {
+            return true;
+        }
         return false;
     }
 

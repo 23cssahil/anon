@@ -3,633 +3,1106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anonymous Call - Private Calling Platform</title>
+    <title>Anonymous Call — Dashboard</title>
+    <meta name="description" content="Anonymous Call Dashboard — Make private calls with masked caller ID at ₹3/minute.">
     <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary: #7c3aed;
+            --primary-dark: #5b21b6;
+            --primary-light: #a78bfa;
+            --accent: #06b6d4;
+            --accent-dark: #0e7490;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-dark: #0f0c29;
+            --bg-mid: #1a1040;
+            --glass: rgba(255,255,255,0.08);
+            --glass-border: rgba(255,255,255,0.12);
+            --card-bg: rgba(255,255,255,0.95);
+            --text-muted: #94a3b8;
+            --shadow-lg: 0 20px 60px rgba(0,0,0,0.35);
+            --shadow-glow: 0 0 40px rgba(124,58,237,0.3);
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
             min-height: 100vh;
-            color: #333;
+            color: #fff;
         }
 
+        /* ── NAVBAR ── */
         .navbar {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px 30px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            background: rgba(15,12,41,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 14px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 200;
         }
 
         .navbar-brand {
-            font-size: 22px;
-            font-weight: bold;
-            color: #667eea;
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
             display: flex;
             align-items: center;
             gap: 10px;
+            letter-spacing: -0.3px;
         }
 
-        .navbar-brand i {
-            font-size: 28px;
-        }
-
-        .navbar-user {
+        .navbar-brand .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 10px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            justify-content: center;
+            font-size: 16px;
         }
 
-        .logout-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+        .navbar-brand .brand-badge {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Profile Dropdown */
+        .profile-wrapper {
+            position: relative;
+        }
+
+        .profile-trigger {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
+            padding: 6px 12px 6px 6px;
+            border-radius: 50px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            transition: all 0.2s ease;
         }
 
-        .logout-btn:hover {
-            background: #c82333;
+        .profile-trigger:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(124,58,237,0.5);
         }
 
+        .profile-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .profile-name-mini {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .profile-chevron {
+            font-size: 11px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .profile-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 260px;
+            background: #1e1b4b;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: var(--shadow-lg);
+            z-index: 300;
+            animation: dropIn 0.2s ease-out;
+        }
+
+        @keyframes dropIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-dropdown.open {
+            display: block;
+        }
+
+        .dropdown-user-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 22px;
+            margin: 0 auto 12px;
+            box-shadow: 0 0 20px rgba(124,58,237,0.5);
+        }
+
+        .dropdown-user-name {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .dropdown-user-email {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            word-break: break-all;
+        }
+
+        .dropdown-member-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 10px auto;
+            background: rgba(124,58,237,0.2);
+            border: 1px solid rgba(124,58,237,0.3);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--primary-light);
+            width: fit-content;
+        }
+
+        .dropdown-divider {
+            border: none;
+            border-top: 1px solid var(--glass-border);
+            margin: 12px 0;
+        }
+
+        .dropdown-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .dropdown-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dropdown-meta-row i {
+            width: 14px;
+            color: var(--primary-light);
+        }
+
+        .dropdown-logout-btn {
+            width: 100%;
+            margin-top: 14px;
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: #fca5a5;
+            padding: 9px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .dropdown-logout-btn:hover {
+            background: rgba(239,68,68,0.25);
+            border-color: rgba(239,68,68,0.5);
+            color: #fff;
+        }
+
+        /* ── MAIN CONTAINER ── */
         .container {
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 0 20px;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 28px 20px 60px;
+        }
+
+        /* ── LOGIN SCREEN ── */
+        #login-section { display: block; }
+
+        .login-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
 
         .login-card {
-            background: white;
-            border-radius: 15px;
-            padding: 50px;
+            background: rgba(30,27,75,0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 48px 40px;
             text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 420px;
+            box-shadow: var(--shadow-lg), var(--shadow-glow);
             animation: slideUp 0.5s ease-out;
         }
 
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .login-logo {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin: 0 auto 24px;
+            box-shadow: 0 0 30px rgba(124,58,237,0.5);
         }
 
         .login-card h1 {
-            color: #667eea;
-            font-size: 32px;
-            margin-bottom: 15px;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
         }
 
-        .login-card p {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 30px;
+        .login-card .subtitle {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-bottom: 8px;
         }
 
-        .google-login-btn {
-            background: white;
-            border: 2px solid #667eea;
-            color: #667eea;
-            padding: 14px 30px;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.3s;
-            display: inline-block;
+        .login-price-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.2));
+            border: 1px solid rgba(124,58,237,0.4);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-light);
+            margin: 12px 0 28px;
         }
 
-        .google-login-btn:hover {
-            background: #667eea;
-            color: white;
-        }
-
-        .google-login-btn:disabled {
-            background: #ccc;
-            color: #999;
-            cursor: not-allowed;
-            border-color: #999;
-        }
-
-        #dashboard-section {
-            display: none;
-        }
-
-        .card {
-            background: white;
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px;
+            background: #fff;
+            color: #1f2937;
+            border: none;
             border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-            animation: slideUp 0.5s ease-out;
-            margin-bottom: 25px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
-        .card h2 {
-            color: #667eea;
-            font-size: 20px;
-            margin-bottom: 20px;
+        .google-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .google-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .google-btn .google-icon {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* ── DASHBOARD ── */
+        #dashboard-section { display: none; }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Profile Card */
+        .profile-card {
+            background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.15));
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 28px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            box-shadow: var(--shadow-glow);
+            animation: slideUp 0.4s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .profile-card::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle, rgba(124,58,237,0.2), transparent 70%);
+            pointer-events: none;
+        }
+
+        .profile-card-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 800;
+            flex-shrink: 0;
+            box-shadow: 0 0 24px rgba(124,58,237,0.5);
+            border: 3px solid rgba(255,255,255,0.2);
+        }
+
+        .profile-card-info { flex: 1; min-width: 0; }
+
+        .profile-card-name {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
+        }
+
+        .profile-card-email {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-member {
+            background: rgba(124,58,237,0.2);
+            border: 1px solid rgba(124,58,237,0.35);
+            color: var(--primary-light);
+        }
+
+        .badge-verified {
+            background: rgba(16,185,129,0.15);
+            border: 1px solid rgba(16,185,129,0.3);
+            color: #6ee7b7;
+        }
+
+        .profile-balance-mini {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .balance-mini-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .balance-mini-amount {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #a78bfa, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .balance-mini-rate {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Glass Cards */
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            animation: slideUp 0.5s ease-out;
+            color: #1e1b4b;
+        }
+
+        .card-header {
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .card h2 i {
-            font-size: 24px;
-        }
-
-        .balance-display {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
             margin-bottom: 20px;
         }
 
-        .balance-display .label {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
+        .card-header-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 15px;
+            flex-shrink: 0;
         }
 
-        .balance-display .amount {
-            font-size: 36px;
-            font-weight: bold;
+        .card-header h2 {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1e1b4b;
+            letter-spacing: -0.2px;
         }
 
-        .form-group {
-            margin-bottom: 15px;
+        /* Recharge Card */
+        .qr-container {
+            text-align: center;
+            margin: 12px 0 16px;
         }
+
+        .qr-img {
+            width: 160px;
+            height: 160px;
+            border-radius: 14px;
+            border: 3px solid #ede9fe;
+            display: block;
+            margin: 0 auto 8px;
+            object-fit: cover;
+        }
+
+        .upi-id-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .hint-box {
+            background: #eff6ff;
+            border-left: 4px solid var(--accent);
+            padding: 12px 14px;
+            border-radius: 0 10px 10px 0;
+            font-size: 13px;
+            color: #1e40af;
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+
+        .pool-warning {
+            background: #fff7ed;
+            border-left: 4px solid var(--warning);
+            padding: 10px 14px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        /* Form Inputs */
+        .form-group { margin-bottom: 14px; }
 
         .form-group label {
             display: block;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 8px;
-            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+            font-size: 13px;
         }
 
         .form-group input,
         .form-group select {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 11px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             font-size: 14px;
-            transition: 0.3s;
+            font-family: 'Outfit', sans-serif;
+            color: #1f2937;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #f9fafb;
         }
 
         .form-group input:focus,
         .form-group select:focus {
-            border-color: #667eea;
+            border-color: var(--primary);
             outline: none;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
-        }
-
-        .btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            transition: 0.3s;
-            width: 100%;
-        }
-
-        .btn:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn:disabled {
-            background: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            background: #34a853;
-            margin-top: 10px;
-        }
-
-        .btn-secondary:hover {
-            background: #2d8e47;
-        }
-
-        .btn-phonpe {
-            background: #5f259f;
-        }
-
-        .btn-phonpe:hover {
-            background: #4a1f7a;
-        }
-
-        .hint-box {
-            background: #e8f4fd;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            border-radius: 6px;
-            font-size: 14px;
-            color: #1565c0;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-
-        .warning-box {
-            background: #fce8e6;
-            border-left: 4px solid #d93025;
-            padding: 15px;
-            border-radius: 6px;
-            font-size: 14px;
-            color: #c5221f;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-
-        .instruction-box {
-            background: #fff8e1;
-            border-left: 4px solid #fbc02d;
-            padding: 15px;
-            border-radius: 6px;
-            font-size: 13px;
-            color: #5d4037;
-            margin-top: 15px;
-            line-height: 1.6;
+            box-shadow: 0 0 0 4px rgba(124,58,237,0.1);
+            background: #fff;
         }
 
         .gst-display {
-            font-size: 16px;
-            color: #d93025;
-            font-weight: bold;
-            margin: 10px 0;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #374151;
             text-align: center;
+            margin-bottom: 12px;
+            min-height: 36px;
         }
 
-        .table-responsive {
+        /* Buttons */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn:hover { transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(124,58,237,0.35);
+        }
+
+        .btn-primary:hover { box-shadow: 0 8px 25px rgba(124,58,237,0.45); }
+
+        .btn-phonepe {
+            background: linear-gradient(135deg, #6b21a8, #4c1d95);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(107,33,168,0.35);
+        }
+
+        .btn-phonepe:hover { box-shadow: 0 8px 25px rgba(107,33,168,0.45); }
+
+        .btn-success {
+            background: linear-gradient(135deg, #059669, #047857);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(5,150,105,0.3);
+            margin-top: 10px;
+        }
+
+        .btn-success:hover { box-shadow: 0 8px 25px rgba(5,150,105,0.4); }
+
+        .btn-call {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            font-size: 16px;
+            padding: 14px;
+            box-shadow: 0 4px 20px rgba(16,185,129,0.4);
+        }
+
+        .btn-call:hover { box-shadow: 0 8px 30px rgba(16,185,129,0.5); }
+
+        /* Status Messages */
+        .status-msg {
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status-success { background: #d1fae5; color: #065f46; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-info { background: #dbeafe; color: #1e40af; }
+
+        /* Instructions Box */
+        .instruction-box {
+            background: #fffbeb;
+            border-left: 4px solid var(--warning);
+            padding: 12px 14px;
+            border-radius: 0 10px 10px 0;
+            font-size: 13px;
+            color: #78350f;
+            margin-top: 14px;
+            line-height: 1.7;
+        }
+
+        /* Call History Table */
+        .table-wrapper {
             overflow-x: auto;
-            margin-top: 15px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            margin-top: 4px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
+            min-width: 480px;
         }
 
         thead th {
-            background: #f5f5f5;
-            padding: 12px;
+            background: #f5f3ff;
+            padding: 12px 14px;
             text-align: left;
-            font-weight: bold;
-            color: #333;
-            border-bottom: 2px solid #e0e0e0;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6d28d9;
+            border-bottom: 2px solid #ede9fe;
         }
 
         tbody td {
-            padding: 12px;
-            border-bottom: 1px solid #e0e0e0;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 13px;
+            color: #374151;
         }
 
-        tbody tr {
-            transition: 0.2s;
-            cursor: pointer;
+        tbody tr { transition: background 0.15s; }
+        tbody tr:hover { background: #faf5ff; }
+        tbody tr:last-child td { border-bottom: none; }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
         }
 
-        tbody tr:hover {
-            background: #f9f9f9;
-        }
+        .badge-completed { background: #d1fae5; color: #065f46; }
+        .badge-answered { background: #dbeafe; color: #1e40af; }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+        .badge-no-answer { background: #fef3c7; color: #92400e; }
+        .badge-cancelled { background: #f3f4f6; color: #4b5563; }
+        .badge-initiated { background: #ede9fe; color: #5b21b6; }
+        .badge-ringing { background: #e0f2fe; color: #075985; }
 
-        .status-msg {
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 10px;
+        .empty-history {
             text-align: center;
-            font-weight: bold;
+            padding: 40px 20px;
+            color: #9ca3af;
         }
 
-        .status-success {
-            background: #d4edda;
-            color: #155724;
-        }
+        .empty-history i { font-size: 36px; margin-bottom: 12px; display: block; opacity: 0.4; }
+        .empty-history p { font-size: 14px; }
 
-        .status-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .status-info {
-            background: #d1ecf1;
-            color: #0c5460;
+        /* Delete hint */
+        .history-hint {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         /* Modal */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(6px);
             z-index: 9999;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
         }
+
+        .modal.open { display: flex; }
 
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 400px;
+            background: #fff;
+            padding: 28px 24px;
+            border-radius: 20px;
+            max-width: 380px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            animation: slideUp 0.3s ease-out;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.25s ease-out;
         }
 
+        .modal-icon { font-size: 36px; margin-bottom: 12px; }
         .modal-msg {
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 25px;
+            font-size: 15px;
+            color: #1f2937;
             line-height: 1.6;
-            word-wrap: break-word;
+            margin-bottom: 22px;
+            font-family: 'Outfit', sans-serif;
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
 
-        .modal-buttons button {
-            padding: 10px 20px;
+        .modal-btn {
+            padding: 10px 24px;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
-            font-weight: bold;
-            width: auto;
-            transition: 0.3s;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
         }
 
-        .modal-btn-ok {
-            background: #667eea;
-            color: white;
+        .modal-btn-ok { background: var(--primary); color: #fff; }
+        .modal-btn-ok:hover { background: var(--primary-dark); }
+        .modal-btn-cancel { background: #fee2e2; color: #991b1b; }
+        .modal-btn-cancel:hover { background: #fecaca; }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .navbar { padding: 12px 16px; }
+            .profile-card { flex-direction: column; text-align: center; gap: 16px; }
+            .profile-balance-mini { text-align: center; }
+            .profile-badges { justify-content: center; }
+            .login-card { padding: 32px 24px; }
+            .container { padding: 16px 12px 60px; }
+            .profile-name-mini { display: none; }
         }
 
-        .modal-btn-ok:hover {
-            background: #5568d3;
-        }
-
-        .modal-btn-cancel {
-            background: #dc3545;
-            color: white;
-        }
-
-        .modal-btn-cancel:hover {
-            background: #c82333;
-        }
-
-        .call-status {
-            font-weight: bold;
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 10px;
-            text-align: center;
-        }
-
-        @media (max-width: 768px) {
-            .navbar {
-                flex-wrap: wrap;
-                padding: 15px;
-            }
-
-            .login-card {
-                padding: 30px 20px;
-            }
-
-            .login-card h1 {
-                font-size: 24px;
-            }
-
-            .balance-display .amount {
-                font-size: 28px;
-            }
-        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 3px; }
     </style>
 </head>
 <body>
 
-    <!-- Navbar -->
-    <div class="navbar" id="navbar" style="display: none;">
+    <!-- ── NAVBAR ── -->
+    <nav class="navbar" id="navbar" style="display:none;">
         <div class="navbar-brand">
-            <i class="fas fa-phone-slash"></i>
+            <div class="brand-icon"><i class="fas fa-user-secret"></i></div>
             Anonymous Call
+            <span class="brand-badge">Private</span>
         </div>
-        <div class="navbar-user" id="navbar-user" style="display: none;">
-            <span id="navbar-username" style="color: #333; font-weight: bold;"></span>
-            <button class="logout-btn" onclick="logout()">Logout</button>
-        </div>
-    </div>
+        <div class="navbar-right" id="navbar-user" style="display:none;">
+            <div class="profile-wrapper" id="profile-wrapper">
+                <div class="profile-trigger" id="profile-trigger" onclick="toggleDropdown()">
+                    <div class="profile-avatar" id="nav-avatar">?</div>
+                    <span class="profile-name-mini" id="navbar-username">User</span>
+                    <i class="fas fa-chevron-down profile-chevron" id="profile-chevron"></i>
+                </div>
 
-    <!-- Modal -->
+                <!-- Profile Dropdown -->
+                <div class="profile-dropdown" id="profile-dropdown">
+                    <div class="dropdown-user-avatar" id="dd-avatar">?</div>
+                    <div class="dropdown-user-name" id="dd-name">Loading...</div>
+                    <div class="dropdown-user-email" id="dd-email">—</div>
+                    <div class="dropdown-member-badge">
+                        <i class="fas fa-crown" style="font-size:10px;"></i>
+                        <span id="dd-member-since">Member</span>
+                    </div>
+                    <hr class="dropdown-divider">
+                    <div class="dropdown-meta">
+                        <div class="dropdown-meta-row">
+                            <i class="fas fa-wallet"></i>
+                            <span>Balance: ₹<span id="dd-balance">0.00</span></span>
+                        </div>
+                        <div class="dropdown-meta-row">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Terms Accepted</span>
+                        </div>
+                        <div class="dropdown-meta-row">
+                            <i class="fas fa-phone"></i>
+                            <span>₹3/min (18% GST incl.)</span>
+                        </div>
+                    </div>
+                    <button class="dropdown-logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── MODAL ── -->
     <div id="custom-modal" class="modal">
         <div class="modal-content">
+            <div class="modal-icon" id="modal-icon">ℹ️</div>
             <div id="modal-msg" class="modal-msg"></div>
             <div class="modal-buttons">
-                <button id="modal-ok-btn" class="modal-btn-ok" onclick="closeModal(true)">OK</button>
-                <button id="modal-cancel-btn" class="modal-btn-cancel" onclick="closeModal(false)" style="display: none;">Cancel</button>
+                <button id="modal-ok-btn" class="modal-btn modal-btn-ok" onclick="closeModal(true)">OK</button>
+                <button id="modal-cancel-btn" class="modal-btn modal-btn-cancel" onclick="closeModal(false)" style="display:none;">Cancel</button>
             </div>
         </div>
     </div>
 
-    <!-- Main Container -->
-    <div class="container">
-        <!-- Login Section -->
-        <div id="login-section">
+    <!-- ── LOGIN SECTION ── -->
+    <div id="login-section">
+        <div class="login-wrap">
             <div class="login-card">
-                <div style="margin-bottom: 30px;">
-                    <i class="fas fa-phone-slash" style="font-size: 48px; color: #667eea;"></i>
+                <div class="login-logo">
+                    <i class="fas fa-user-secret"></i>
                 </div>
                 <h1>Anonymous Call</h1>
-                <p>Private calling platform with masked caller ID</p>
-                <p style="font-size: 18px; color: #667eea; font-weight: bold;">₹3/minute</p>
-                <button id="login-btn" class="google-login-btn" onclick="loginWithGoogle()">
-                    <i class="fab fa-google"></i> Sign in with Google
+                <p class="subtitle">Private calling with masked caller ID</p>
+                <div class="login-price-badge">
+                    <i class="fas fa-rupee-sign"></i>
+                    ₹3 / minute &nbsp;•&nbsp; No hidden charges
+                </div>
+                <button id="login-btn" class="google-btn" onclick="loginWithGoogle()">
+                    <svg class="google-icon" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
                 </button>
             </div>
         </div>
-
-        <!-- Dashboard Section -->
-        <div id="dashboard-section">
-            <!-- Balance Card -->
-            <div class="card">
-                <h2><i class="fas fa-wallet"></i> Your Balance</h2>
-                <div class="balance-display">
-                    <div class="label">Current Balance</div>
-                    <div class="amount">₹<span id="balance-amount">0.00</span></div>
-                </div>
-                <p style="text-align: center; color: #666; font-size: 13px; margin-top: 10px;">
-                    Rate: ₹3 per minute (60-second pulse)
-                </p>
-            </div>
-            
-
-           <div class="card" style="text-align: center;">
-    <h2><i class="fas fa-credit-card"></i> Recharge Wallet</h2>
-    
-    <div class="hint-box" style="margin-bottom: 15px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
-        <strong>📱 Instant Pay:</strong><br>
-        1. Amount enter karein.<br>
-        2. <strong>"Scan & Pay via PhonePe"</strong> button par click karein.<br>
-        3. QR code se payment karein (UPI: <strong>8423609308@ybl</strong>).
     </div>
 
-    <!-- QR Code Image -->
-    <img src="/images/phonepe-qr.jpg" alt="PhonePe QR Code" style="width: 170px; height: 170px; margin: 10px auto; display: block; border: 1px solid #ccc; border-radius: 8px;">
-    
-    <span style="font-size: 14px; color: #5f259f; font-weight: bold;">UPI ID: 8423609308@ybl</span>
+    <!-- ── DASHBOARD SECTION ── -->
+    <div id="dashboard-section">
+        <div class="container">
 
-    <div class="form-group" style="margin-top: 15px;">
-    <label>Amount (₹)</label>
-    <!-- Yahan colons ki jagah semicolons (;) kar diya hai -->
-    <input type="number" id="recharge-amount" placeholder="Enter amount (e.g. 10)" min="3" step="1" oninput="calculateGst(); updateUpiLink();">
-</div>
+            <!-- User Profile Card -->
+            <div class="profile-card" id="profile-card">
+                <div class="profile-card-avatar" id="profile-avatar-large">?</div>
+                <div class="profile-card-info">
+                    <div class="profile-card-name" id="profile-name">Loading...</div>
+                    <div class="profile-card-email" id="profile-email">—</div>
+                    <div class="profile-badges">
+                        <span class="badge badge-member">
+                            <i class="fas fa-crown" style="font-size:9px;"></i>
+                            Member since <span id="profile-member-since">—</span>
+                        </span>
+                        <span class="badge badge-verified">
+                            <i class="fas fa-check-circle" style="font-size:9px;"></i>
+                            Verified
+                        </span>
+                    </div>
+                </div>
+                <div class="profile-balance-mini">
+                    <div class="balance-mini-label">Wallet Balance</div>
+                    <div class="balance-mini-amount">₹<span id="balance-amount">0.00</span></div>
+                    <div class="balance-mini-rate">₹3.54/min incl. GST</div>
+                </div>
+            </div>
 
-<div class="gst-display" id="gst-display" style="margin-bottom: 15px; font-weight: bold;">Total: ₹0.00</div>
+            <!-- Recharge Card -->
+            <div class="card" id="recharge-card">
+                <div class="card-header">
+                    <div class="card-header-icon"><i class="fas fa-credit-card"></i></div>
+                    <h2>Recharge Wallet</h2>
+                </div>
 
-<!-- Scan & Pay Button -->
-<a href="javascript:void(0);" id="scan-pay-btn" class="btn" onclick="openPhonePeApp(event)" style="display: block; text-align: center; text-decoration: none; background-color: #5f259f; color: white; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-sizing: border-box;">
-    <i class="fas fa-qrcode"></i> Scan & Pay via PhonePe
-</a>
+                <div id="pool-warning" class="pool-warning">
+                    <strong>⚠️ Notice:</strong> <span id="pool-warning-text">Pool currently low.</span>
+                </div>
 
-<!-- Confirm Balance Button -->
-<button id="add-min-btn" class="btn btn-secondary" onclick="confirmAndAddMinutes()" style="margin-top: 10px; width: 100%; background: #28a745; color: white; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
-    <i class="fas fa-check"></i> Payment Status Check Karein
-</button>
-<script>
-// 1. Jaise hi user amount type karega, link set ho jayega
-function updateUpiLink() {
-    const amountInput = document.getElementById('recharge-amount').value;
-    const amount = Number(amountInput);
-    const scanPayBtn = document.getElementById('scan-pay-btn');
+                <div class="hint-box">
+                    <strong>📱 How to Pay:</strong><br>
+                    1. Amount enter karein below.<br>
+                    2. <strong>"Scan &amp; Pay via PhonePe"</strong> click karein.<br>
+                    3. QR code scan karein (UPI: <strong>8423609308@ybl</strong>).
+                </div>
 
-    if (amount >= 3) {
-        const upiPayUrl = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-        scanPayBtn.href = upiPayUrl;
-    } else {
-        scanPayBtn.href = "javascript:void(0);";
-    }
-}
+                <div class="qr-container">
+                    <img src="/images/phonepe-qr.jpg" alt="PhonePe QR Code" class="qr-img">
+                    <div class="upi-id-badge">
+                        <i class="fas fa-mobile-alt" style="color:#5f259f;"></i>
+                        UPI: 8423609308@ybl
+                    </div>
+                </div>
 
-// 2. Jab user click karega, agar amount kam hua toh rok lega
-function openPhonePeApp(event) {
-    const amountInput = document.getElementById('recharge-amount').value;
-    const amount = Number(amountInput);
+                <div class="form-group">
+                    <label for="recharge-amount">Amount (₹)</label>
+                    <input type="number" id="recharge-amount" placeholder="Enter amount (minimum ₹3)" min="3" step="1"
+                        oninput="calculateGst(); updateUpiLink();">
+                </div>
 
-    if (!amount || amount < 3) {
-        if (event) event.preventDefault();
-        alert('Kam se kam ₹3 ya usse zyada ka amount enter karein!');
-        return;
-    }
-}
-</script>
+                <div class="gst-display" id="gst-display">Total: ₹0.00</div>
+
+                <a href="javascript:void(0);" id="scan-pay-btn" class="btn btn-phonepe"
+                    onclick="openPhonePeApp(event)">
+                    <i class="fas fa-qrcode"></i> Scan &amp; Pay via PhonePe
+                </a>
+
+                <button id="add-min-btn" class="btn btn-success" onclick="confirmAndAddMinutes()" disabled>
+                    <i class="fas fa-check-circle"></i> Payment Done – Check Status
+                </button>
+            </div>
+
             <!-- Make Call Card -->
             <div class="card">
-                <h2><i class="fas fa-phone"></i> Make Anonymous Call</h2>
-
-                <div class="form-group">
-                    <label>Your Phone Number</label>
-                    <input type="text" id="user-phone" placeholder="10-digit number" maxlength="10" inputmode="numeric">
+                <div class="card-header">
+                    <div class="card-header-icon" style="background: linear-gradient(135deg,#10b981,#059669);">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                    <h2>Make Anonymous Call</h2>
                 </div>
 
                 <div class="form-group">
-                    <label>Target Phone Number</label>
-                    <input type="text" id="phone-number" placeholder="10-digit number" maxlength="10" inputmode="numeric">
+                    <label for="user-phone">Your Phone Number</label>
+                    <input type="text" id="user-phone" placeholder="10-digit number (starts with 6-9)"
+                        maxlength="10" inputmode="numeric">
                 </div>
 
                 <div class="form-group">
-                    <label>Call Duration Limit</label>
+                    <label for="phone-number">Target Phone Number</label>
+                    <input type="text" id="phone-number" placeholder="10-digit number (starts with 6-9)"
+                        maxlength="10" inputmode="numeric">
+                </div>
+
+                <div class="form-group">
+                    <label for="max-duration">Call Duration Limit</label>
                     <select id="max-duration">
                         <option value="1">1 Minute</option>
                         <option value="2">2 Minutes</option>
                         <option value="3">3 Minutes</option>
                         <option value="5">5 Minutes</option>
-                        <option value="unlimited">Unlimited</option>
+                        <option value="unlimited">Unlimited (wallet limit)</option>
                     </select>
                 </div>
 
-                <button class="btn" onclick="makeCall()" style="background: #34a853;">
+                <button class="btn btn-call" id="call-btn" onclick="makeCall()">
                     <i class="fas fa-phone"></i> Call Now
                 </button>
 
-                <div id="call-status" class="call-status" style="display: none;"></div>
+                <div id="call-status" class="status-msg"></div>
 
                 <div class="instruction-box">
                     <strong>📞 How it works:</strong><br>
-                    1. You'll get an incoming call first<br>
-                    2. Pick up and you'll be connected<br>
-                    3. Recipient won't see your real number<br>
-                    4. Call auto-cuts when time expires
+                    1. You'll receive an incoming call first<br>
+                    2. Pick up — you'll be auto-connected to the target<br>
+                    3. Recipient sees a masked number, not yours<br>
+                    4. Call auto-disconnects when time expires
                 </div>
             </div>
 
             <!-- Call History Card -->
             <div class="card">
-                <h2><i class="fas fa-history"></i> Call History</h2>
-                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
-                    (Long press on a row to delete)
-                </p>
+                <div class="card-header">
+                    <div class="card-header-icon" style="background: linear-gradient(135deg,#f59e0b,#d97706);">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <h2>Call History</h2>
+                </div>
+                <div class="history-hint">
+                    <i class="fas fa-hand-pointer"></i> Long press on a row to delete
+                </div>
 
-                <div class="table-responsive">
+                <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
                                 <th>Target Number</th>
                                 <th>Duration</th>
+                                <th>Status</th>
                                 <th>Cost</th>
                                 <th>Date</th>
                             </tr>
                         </thead>
                         <tbody id="history-table">
                             <tr>
-                                <td colspan="4" style="text-align: center; color: #999; padding: 30px;">
-                                    <i class="fas fa-inbox" style="font-size: 32px; opacity: 0.5;"></i><br>
-                                    No call history yet
+                                <td colspan="5">
+                                    <div class="empty-history">
+                                        <i class="fas fa-inbox"></i>
+                                        <p>No call history yet</p>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
+
+        </div><!-- /.container -->
+    </div><!-- /#dashboard-section -->
 
     <script>
-        // Firebase Configuration
+        // ── Firebase Config ──
         const firebaseConfig = {
             apiKey: "AIzaSyBbo1qA6gf2-DuKVbpLuhxcExjpAAFsV44",
             authDomain: "anonymous-calling-app-e14de.firebaseapp.com",
@@ -640,31 +1113,41 @@ function openPhonePeApp(event) {
         };
         firebase.initializeApp(firebaseConfig);
 
-        // Global Variables
+        // ── Globals ──
         let userId = null;
         let userToken = null;
-        let calculatedTotal = 0;
-        let currentAvailablePool = 0;
         let modalCallback = null;
 
+        // USER_RATE_WITH_GST = 3 * 1.18 = 3.54 (must match server constant)
+        const USER_RATE_WITH_GST = 3.54;
+
+        // ── Helpers ──
         function authHeaders(includeJson = false) {
-            const headers = {
-                'Authorization': `Bearer ${userToken}`
-            };
-            if (includeJson) headers['Content-Type'] = 'application/json';
-            return headers;
+            const h = { 'Authorization': `Bearer ${userToken}` };
+            if (includeJson) h['Content-Type'] = 'application/json';
+            return h;
         }
 
         function handleUnauthorized(response) {
             if (response.status === 401 || response.status === 403) {
                 showAlert('Session expired. Please login again.');
-                setTimeout(logout, 300);
+                setTimeout(logout, 500);
                 return true;
             }
             return false;
         }
 
-        // Check if already logged in
+        function getInitials(name) {
+            if (!name) return '?';
+            return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        // ── Auto-login check ──
         window.addEventListener('load', () => {
             userId = localStorage.getItem('userId');
             userToken = localStorage.getItem('userToken');
@@ -673,33 +1156,88 @@ function openPhonePeApp(event) {
             }
         });
 
-        // Modal Functions
-        function showAlert(message) {
+        // ── Close dropdown when clicking outside ──
+        document.addEventListener('click', (e) => {
+            const wrapper = document.getElementById('profile-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+
+        // ── Modal ──
+        function showAlert(message, icon = 'ℹ️') {
             document.getElementById('modal-msg').innerText = message;
+            document.getElementById('modal-icon').innerText = icon;
             document.getElementById('modal-cancel-btn').style.display = 'none';
-            document.getElementById('custom-modal').style.display = 'flex';
+            document.getElementById('custom-modal').classList.add('open');
         }
 
-        function showConfirm(message, callback) {
+        function showConfirm(message, callback, icon = '⚠️') {
             document.getElementById('modal-msg').innerText = message;
+            document.getElementById('modal-icon').innerText = icon;
             document.getElementById('modal-cancel-btn').style.display = 'inline-block';
-            document.getElementById('custom-modal').style.display = 'flex';
+            document.getElementById('custom-modal').classList.add('open');
             modalCallback = callback;
         }
 
         function closeModal(result) {
-            document.getElementById('custom-modal').style.display = 'none';
+            document.getElementById('custom-modal').classList.remove('open');
             if (modalCallback) {
-                modalCallback(result);
+                const cb = modalCallback;
                 modalCallback = null;
+                cb(result);
             }
         }
 
-        // Login with Google
+        // ── Profile Dropdown ──
+        function toggleDropdown() {
+            const dd = document.getElementById('profile-dropdown');
+            const chevron = document.getElementById('profile-chevron');
+            const isOpen = dd.classList.contains('open');
+            if (isOpen) {
+                dd.classList.remove('open');
+                chevron.style.transform = '';
+            } else {
+                dd.classList.add('open');
+                chevron.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function closeDropdown() {
+            document.getElementById('profile-dropdown').classList.remove('open');
+            document.getElementById('profile-chevron').style.transform = '';
+        }
+
+        // ── Update UI with user profile data ──
+        function updateProfileUI(name, email, balance, memberSince) {
+            const initials = getInitials(name);
+            const dateStr = formatDate(memberSince);
+            const balStr = Number(balance || 0).toFixed(2);
+
+            // Navbar
+            document.getElementById('nav-avatar').innerText = initials;
+            document.getElementById('navbar-username').innerText = name || 'User';
+
+            // Dropdown
+            document.getElementById('dd-avatar').innerText = initials;
+            document.getElementById('dd-name').innerText = name || 'User';
+            document.getElementById('dd-email').innerText = email || '—';
+            document.getElementById('dd-member-since').innerText = dateStr;
+            document.getElementById('dd-balance').innerText = balStr;
+
+            // Profile Card
+            document.getElementById('profile-avatar-large').innerText = initials;
+            document.getElementById('profile-name').innerText = name || 'User';
+            document.getElementById('profile-email').innerText = email || '—';
+            document.getElementById('profile-member-since').innerText = dateStr;
+            document.getElementById('balance-amount').innerText = balStr;
+        }
+
+        // ── Google Login ──
         async function loginWithGoogle() {
-            const loginBtn = document.getElementById('login-btn');
-            loginBtn.disabled = true;
-            loginBtn.innerText = 'Signing in...';
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
 
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
@@ -725,19 +1263,33 @@ function openPhonePeApp(event) {
                     userToken = data.token;
                     loadDashboard();
                 } else {
-                    showAlert('❌ Login Failed\n\n' + (data.error || 'Unknown error occurred'));
-                    loginBtn.disabled = false;
-                    loginBtn.innerText = '🔐 Sign in with Google';
+                    showAlert('Login Failed\n\n' + (data.error || 'Unknown error occurred.'), '❌');
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <svg class="google-icon" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Continue with Google`;
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showAlert('❌ Login Error\n\n' + error.message);
-                loginBtn.disabled = false;
-                loginBtn.innerText = '🔐 Sign in with Google';
+                showAlert('Login Error\n\n' + error.message, '❌');
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <svg class="google-icon" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google`;
             }
         }
 
-        // Load Dashboard
+        // ── Load Dashboard ──
         async function loadDashboard() {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
@@ -745,47 +1297,53 @@ function openPhonePeApp(event) {
             document.getElementById('navbar-user').style.display = 'flex';
 
             try {
-                const response = await fetch(`/api/balance/${userId}`, {
+                // Fetch full profile from new endpoint
+                const profileResp = await fetch('/api/user/profile', {
                     headers: authHeaders()
                 });
 
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('navbar-username').innerText = data.name || 'User';
-                    const balance = Number(data.balance || 0);
-                    document.getElementById('balance-amount').innerText = balance.toFixed(2);
-                    loadHistory();
-                    checkPoolStatus();
+                if (handleUnauthorized(profileResp)) return;
+
+                const profileData = await profileResp.json();
+
+                if (profileResp.ok && profileData.success) {
+                    const u = profileData.user;
+                    updateProfileUI(u.name, u.email, u.balance, u.memberSince);
                 } else {
-                    if (handleUnauthorized(response)) return;
-                    showAlert(data.error || 'Unable to load account.');
+                    // Fallback to balance endpoint
+                    const balResp = await fetch(`/api/balance/${userId}`, { headers: authHeaders() });
+                    if (handleUnauthorized(balResp)) return;
+                    const balData = await balResp.json();
+                    if (balResp.ok) {
+                        updateProfileUI(balData.name, '', balData.balance, null);
+                    } else {
+                        showAlert(balData.error || 'Unable to load account.', '❌');
+                        return;
+                    }
                 }
+
+                loadHistory();
+                checkPoolStatus();
+
             } catch (error) {
-                console.error('Error loading dashboard:', error);
-                showAlert('Error loading dashboard: ' + error.message);
+                console.error('Dashboard load error:', error);
+                showAlert('Error loading dashboard: ' + error.message, '❌');
             }
         }
 
-       // Check Pool Status
+        // ── Pool Status ──
         async function checkPoolStatus() {
             try {
                 const response = await fetch('/api/pool-status');
                 const data = await response.json();
-                currentAvailablePool = data.availablePoolRupees || 0;
+                const pool = data.availablePoolRupees || 0;
 
-                const payBtn = document.getElementById('pay-btn');
-                const addMinBtn = document.getElementById('add-min-btn');
-                const rechargeInput = document.getElementById('recharge-amount');
                 const poolWarning = document.getElementById('pool-warning');
-
-                if (payBtn) payBtn.disabled = false;
-                if (addMinBtn) addMinBtn.disabled = false;
-                if (rechargeInput) rechargeInput.disabled = false;
-                
-                if (poolWarning) {
-                    if (currentAvailablePool <= 0) {
+                const poolWarningText = document.getElementById('pool-warning-text');
+                if (poolWarning && poolWarningText) {
+                    if (pool <= 0) {
+                        poolWarningText.innerText = `Pool is currently ₹${pool.toFixed(2)}. Calls may not be available right now.`;
                         poolWarning.style.display = 'block';
-                        poolWarning.innerHTML = `<strong>ℹ️ Notice:</strong> Pool is currently ₹${currentAvailablePool.toFixed(2)}, but you can still recharge.`;
                     } else {
                         poolWarning.style.display = 'none';
                     }
@@ -795,232 +1353,264 @@ function openPhonePeApp(event) {
             }
         }
 
-       // Calculate Amount
-function calculateGst() {
+        // ── UPI Link Update (BUG FIX: updateUpiLink moved to proper scope) ──
+        function updateUpiLink() {
+            const amount = Number(document.getElementById('recharge-amount').value);
+            const btn = document.getElementById('scan-pay-btn');
+            if (amount >= 3) {
+                btn.href = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
+            } else {
+                btn.href = 'javascript:void(0);';
+            }
+        }
+
+        function openPhonePeApp(event) {
+            const amount = Number(document.getElementById('recharge-amount').value);
+            if (!amount || amount < 3) {
+                if (event) event.preventDefault();
+                showAlert('Kam se kam ₹3 ya usse zyada ka amount enter karein!', '⚠️');
+            }
+        }
+
+        // ── GST Calculation (BUG FIX: correct minutes = baseAmount / USER_RATE_WITH_GST) ──
+        function calculateGst() {
             const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
+            const gstDisplay = document.getElementById('gst-display');
+            const addBtn = document.getElementById('add-min-btn');
 
             if (baseAmount <= 0) {
-                document.getElementById('gst-display').innerText = 'Total: ₹0.00';
-                const addBtn = document.getElementById('add-min-btn');
+                if (gstDisplay) gstDisplay.innerText = 'Total: ₹0.00';
                 if (addBtn) addBtn.disabled = true;
                 return;
             }
 
-            // 18% GST Calculation (Yeh ab function ke andar hai, toh error nahi aayega)
             const gstAmount = baseAmount * 0.18;
             const totalAmount = baseAmount + gstAmount;
-            const minutes = baseAmount / 3;
+            // BUG FIX: actual talktime = baseAmount / USER_RATE_WITH_GST (3.54), not baseAmount / 3
+            const talkMinutes = baseAmount / USER_RATE_WITH_GST;
 
-            // Display update karein
-            const gstDisplay = document.getElementById('gst-display');
             if (gstDisplay) {
-                gstDisplay.innerHTML = `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br><b style="color: #28a745;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br><small style="color: #5f259f;">Talktime: ${minutes.toFixed(1)} Minutes</small>`;
+                gstDisplay.innerHTML =
+                    `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br>` +
+                    `<b style="color:#059669;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br>` +
+                    `<small style="color:#7c3aed;">Talktime: ~${talkMinutes.toFixed(1)} Minutes</small>`;
             }
-
-            // Button enable karein
-            const addBtn = document.getElementById('add-min-btn');
-            if (addBtn) {
-                addBtn.disabled = false;
-            }
+            if (addBtn) addBtn.disabled = false;
         }
-        // Payment confirmation
+
+        // ── Confirm Recharge ──
         async function confirmAndAddMinutes() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
-
             if (amount < 3 || !Number.isFinite(amount)) {
-                showAlert('Enter a valid amount (minimum ₹3).');
+                showAlert('Enter a valid amount (minimum ₹3).', '⚠️');
                 return;
             }
 
             const totalAmount = Number((amount * 1.18).toFixed(2));
-
             showConfirm(
                 `Payment of ₹${totalAmount.toFixed(2)} complete hone ke baad hi balance add hoga. Continue?`,
                 async (confirmed) => {
                     if (!confirmed) return;
-
                     try {
                         const response = await fetch('/api/add-recharge', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${userToken}`
-                            },
-                            body: JSON.stringify({ amount: amount })
+                            headers: authHeaders(true),
+                            body: JSON.stringify({ amount })
                         });
-
                         const data = await response.json().catch(() => ({}));
 
                         if (response.ok) {
-                            showAlert('✅ Recharge request accepted.');
+                            showAlert('✅ Recharge request accepted!', '✅');
                             if (typeof data.newBalance === 'number') {
-                                document.getElementById('balance-amount').innerText =
-                                    data.newBalance.toFixed(2);
+                                const bal = data.newBalance.toFixed(2);
+                                document.getElementById('balance-amount').innerText = bal;
+                                document.getElementById('dd-balance').innerText = bal;
                             }
                             document.getElementById('recharge-amount').value = '';
                             document.getElementById('gst-display').innerText = 'Total: ₹0.00';
+                            document.getElementById('add-min-btn').disabled = true;
                             checkPoolStatus();
                         } else if (response.status === 503) {
                             showAlert(
-                                '⚠️ Payment verification is not enabled yet. ' +
-                                'UPI payment hone ke baad balance automatically add nahi hoga.'
+                                '⚠️ Payment verification is not enabled yet.\n\n' +
+                                'UPI payment ke baad balance manually add kiya jayega.',
+                                '⚠️'
                             );
                         } else {
-                            showAlert('❌ ' + (data.error || 'Recharge could not be processed.'));
+                            showAlert('❌ ' + (data.error || 'Recharge could not be processed.'), '❌');
                         }
                     } catch (error) {
-                        showAlert('❌ Network error: ' + error.message);
+                        showAlert('❌ Network error: ' + error.message, '❌');
                     }
-                }
+                },
+                '💳'
             );
         }
 
-        // Make Call
+        // ── Make Call (BUG FIX: correct API fields + regex [6-9]\d{9}) ──
         async function makeCall() {
             const userPhone = document.getElementById('user-phone').value.trim();
             const targetPhone = document.getElementById('phone-number').value.trim();
             const maxDuration = document.getElementById('max-duration').value;
             const statusEl = document.getElementById('call-status');
-            const callBtn = document.querySelector('button[onclick="makeCall()"]');
+            const callBtn = document.getElementById('call-btn');
 
-            if (!/^\d{10}$/.test(userPhone) || !/^\d{10}$/.test(targetPhone)) {
-                showAlert('Please enter valid 10-digit numbers');
+            // BUG FIX: regex now matches server validation [6-9]\d{9}
+            const phoneRegex = /^[6-9]\d{9}$/;
+            if (!phoneRegex.test(userPhone)) {
+                showAlert('Your phone number must be a valid 10-digit Indian number starting with 6-9.', '⚠️');
                 return;
             }
-
+            if (!phoneRegex.test(targetPhone)) {
+                showAlert('Target phone number must be a valid 10-digit Indian number starting with 6-9.', '⚠️');
+                return;
+            }
             if (userPhone === targetPhone) {
-                showAlert('Your number and target number cannot be the same.');
+                showAlert('Your number aur target number same nahi ho sakte.', '⚠️');
                 return;
             }
 
-            if (callBtn) callBtn.disabled = true;
+            callBtn.disabled = true;
             statusEl.style.display = 'block';
-            statusEl.className = 'call-status status-info';
+            statusEl.className = 'status-msg status-info';
             statusEl.innerText = '📞 Initiating call...';
 
             try {
                 const response = await fetch('/api/call', {
                     method: 'POST',
                     headers: authHeaders(true),
-                    body: JSON.stringify({
-                        userId,
-                        userPhone,
-                        phoneNumber: targetPhone,
-                        maxDuration
-                    })
+                    body: JSON.stringify({ userId, userPhone, phoneNumber: targetPhone, maxDuration })
                 });
 
                 const data = await response.json();
                 if (response.ok) {
-                    const cost = Number(data.cost || 0);
-                    const duration = data.durationMinutes || 1;
+                    // BUG FIX: use correct fields from server response
+                    const reservedAmount = Number(data.reservedAmount || 0);
+                    const maxMins = Number(data.maxDurationMinutes || 1);
                     const remainingBalance = Number(data.remainingBalance || 0);
+                    const balStr = remainingBalance.toFixed(2);
 
-                    statusEl.className = 'call-status status-success';
-                    statusEl.innerText = `✅ Call started! Reserved: ${duration} min | Cost: ₹${cost.toFixed(2)}`;
-                    document.getElementById('balance-amount').innerText = remainingBalance.toFixed(2);
-                    
+                    statusEl.className = 'status-msg status-success';
+                    statusEl.innerText = `✅ Call started! Reserved: ₹${reservedAmount.toFixed(2)} for ${maxMins} min`;
+
+                    document.getElementById('balance-amount').innerText = balStr;
+                    document.getElementById('dd-balance').innerText = balStr;
+
                     setTimeout(() => {
                         loadHistory();
                         statusEl.style.display = 'none';
-                    }, 2000);
+                    }, 3000);
                 } else {
                     if (handleUnauthorized(response)) return;
-                    statusEl.className = 'call-status status-error';
+                    statusEl.className = 'status-msg status-error';
                     statusEl.innerText = '❌ ' + (data.error || 'Call failed');
                 }
             } catch (error) {
-                statusEl.className = 'call-status status-error';
+                statusEl.className = 'status-msg status-error';
                 statusEl.innerText = '❌ Error: ' + error.message;
             } finally {
-                if (callBtn) callBtn.disabled = false;
+                callBtn.disabled = false;
             }
         }
 
-        // Load History
+        // ── Status Badge HTML ──
+        function statusBadge(status) {
+            const map = {
+                'completed': ['badge-completed', 'check-circle', 'Completed'],
+                'answered':  ['badge-answered',  'phone',        'Answered'],
+                'failed':    ['badge-failed',     'times-circle', 'Failed'],
+                'no-answer': ['badge-no-answer',  'phone-slash',  'No Answer'],
+                'cancelled': ['badge-cancelled',  'ban',          'Cancelled'],
+                'initiated': ['badge-initiated',  'circle',       'Initiated'],
+                'ringing':   ['badge-ringing',    'bell',         'Ringing'],
+            };
+            const [cls, icon, label] = map[status] || ['badge-initiated', 'circle', status || 'Unknown'];
+            return `<span class="status-badge ${cls}"><i class="fas fa-${icon}" style="font-size:9px;"></i> ${label}</span>`;
+        }
+
+        // ── Load History ──
         async function loadHistory() {
             try {
-                const response = await fetch(`/api/history/${userId}`, {
-                    headers: authHeaders()
-                });
-
+                const response = await fetch(`/api/history/${userId}`, { headers: authHeaders() });
                 if (handleUnauthorized(response)) return;
+
                 const history = await response.json();
                 const tbody = document.getElementById('history-table');
                 tbody.innerHTML = '';
 
                 if (!Array.isArray(history) || history.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #999; padding: 30px;">
-                        <i class="fas fa-inbox" style="font-size: 32px; opacity: 0.5;"></i><br>
-                        No call history yet
+                    tbody.innerHTML = `<tr><td colspan="5">
+                        <div class="empty-history">
+                            <i class="fas fa-inbox"></i>
+                            <p>No call history yet</p>
+                        </div>
                     </td></tr>`;
                     return;
                 }
 
                 history.forEach(item => {
                     const tr = document.createElement('tr');
-                    const targetPhone = item.targetPhone || 'N/A';
-                    const duration = item.durationMinutes || 1;
-                    const cost = Number(item.cost || 0);
-                    const date = item.date ? new Date(item.date).toLocaleDateString() : '';
+                    const targetPhone = String(item.targetPhone || 'N/A').replace(/[&<>"']/g, c =>
+                        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+                    );
 
-                    const safeTargetPhone = String(targetPhone).replace(/[&<>"']/g, char => ({
-                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-                    }[char]));
+                    // BUG FIX: show 0 for no-answer/failed, not default 1
+                    const duration = (item.durationMinutes !== undefined && item.durationMinutes !== null)
+                        ? item.durationMinutes : 0;
+                    const cost = Number(item.cost || 0);
+                    const date = item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                    const status = item.status || 'unknown';
 
                     tr.innerHTML = `
-                        <td><strong>${safeTargetPhone}</strong></td>
-                        <td>${Number(duration) || 0} min</td>
+                        <td><strong>${targetPhone}</strong></td>
+                        <td>${duration} min</td>
+                        <td>${statusBadge(status)}</td>
                         <td>₹${cost.toFixed(2)}</td>
                         <td>${date}</td>
                     `;
 
                     let pressTimer;
-                    const startPress = () => {
-                        pressTimer = setTimeout(() => {
-                            showConfirm(`Delete this call record?`, async (confirmed) => {
-                                if (confirmed) await deleteHistory(item._id);
-                            });
-                        }, 600);
-                    };
-
+                    const startPress = () => { pressTimer = setTimeout(() => {
+                        showConfirm('Delete this call record?', async (confirmed) => {
+                            if (confirmed) await deleteHistory(item._id);
+                        }, '🗑️');
+                    }, 600); };
                     const cancelPress = () => clearTimeout(pressTimer);
 
                     tr.addEventListener('mousedown', startPress);
                     tr.addEventListener('mouseup', cancelPress);
                     tr.addEventListener('mouseleave', cancelPress);
-                    tr.addEventListener('touchstart', startPress);
+                    tr.addEventListener('touchstart', startPress, { passive: true });
                     tr.addEventListener('touchend', cancelPress);
 
                     tbody.appendChild(tr);
                 });
             } catch (error) {
-                console.error('Error loading history:', error);
+                console.error('History load error:', error);
             }
         }
 
-        // Delete History
+        // ── Delete History ──
         async function deleteHistory(historyId) {
             if (!historyId) return;
-
             try {
                 const response = await fetch(`/api/history/${historyId}`, {
                     method: 'DELETE',
                     headers: authHeaders()
                 });
-
                 if (response.ok) {
                     loadHistory();
                 } else {
-                    showAlert('Failed to delete history');
+                    showAlert('Failed to delete history', '❌');
                 }
             } catch (error) {
-                showAlert('Error: ' + error.message);
+                showAlert('Error: ' + error.message, '❌');
             }
         }
 
-        // Logout
+        // ── Logout ──
         async function logout() {
+            closeDropdown();
             await firebase.auth().signOut();
             localStorage.removeItem('userId');
             localStorage.removeItem('userToken');
