@@ -985,7 +985,8 @@
                     <strong>📱 How to Pay:</strong><br>
                     1. QR code scan karein (UPI: <strong>8423609308@ybl</strong>).<br>
                     2. Payment ke baad PhonePe se 12-digit <strong>UTR/Reference No.</strong> copy karein.<br>
-                    3. Niche Amount aur UTR daal kar Submit dabayein.
+                    3. Niche Amount aur UTR daal kar Submit dabayein.<br>
+                    <span style="color:#059669;font-weight:600;"><i class="fas fa-clock"></i> Note: Admin 1 ghante ke andar verify karke minutes add kar dega.</span>
                 </div>
 
                 <div class="qr-container">
@@ -1413,7 +1414,7 @@
                         const data = await response.json().catch(() => ({}));
 
                         if (response.ok) {
-                            showAlert('✅ Recharge request submitted! Admin will verify and add balance soon.', '✅');
+                            showAlert('✅ Recharge request submitted!\n\nAdmin 1 ghante ke andar verify karke minutes add kar dega.', '✅');
                             document.getElementById('recharge-amount').value = '';
                             document.getElementById('recharge-utr').value = '';
                             document.getElementById('gst-display').innerText = 'Total Talktime: ~0.0 Minutes';

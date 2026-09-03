@@ -48,7 +48,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
             flex-wrap: wrap;
             gap: 16px;
         }
@@ -87,13 +87,14 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .btn-top {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid var(--border-glass);
             color: #f8fafc;
-            padding: 9px 16px;
+            padding: 9px 15px;
             border-radius: 10px;
             font-family: 'Outfit', sans-serif;
             font-size: 13px;
@@ -110,6 +111,57 @@
             background: rgba(255, 255, 255, 0.16);
             border-color: rgba(255, 255, 255, 0.25);
             transform: translateY(-1px);
+        }
+
+        .btn-notif-active {
+            background: rgba(16, 185, 129, 0.18);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+
+        /* ── Notification Alert Banner ── */
+        .notif-banner {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(6, 182, 212, 0.25));
+            border: 1px solid rgba(124, 58, 237, 0.4);
+            border-radius: 14px;
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .notif-banner-text {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .notif-banner-text i {
+            font-size: 20px;
+            color: #38bdf8;
+        }
+
+        .btn-banner {
+            background: #fff;
+            color: #0f172a;
+            border: none;
+            padding: 7px 15px;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-banner:hover {
+            background: #e2e8f0;
+            transform: scale(1.02);
         }
 
         /* ── Password Gate Modal / Card ── */
@@ -341,6 +393,29 @@
             border: 1px solid rgba(124, 58, 237, 0.3);
         }
 
+        .live-pulse {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #34d399;
+            font-weight: 600;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
         .table-responsive {
             overflow-x: auto;
         }
@@ -369,6 +444,16 @@
 
         tbody tr:hover {
             background: rgba(255, 255, 255, 0.03);
+        }
+
+        tbody tr.row-new {
+            background: rgba(6, 182, 212, 0.12);
+            animation: highlightRow 3s ease-out;
+        }
+
+        @keyframes highlightRow {
+            0% { background: rgba(6, 182, 212, 0.3); }
+            100% { background: transparent; }
         }
 
         tbody td {
@@ -552,10 +637,13 @@
                 </div>
                 <div class="brand-title">
                     <h1>Admin Control Center</h1>
-                    <p>Recharge Request & UTR Verification Portal</p>
+                    <p>Recharge Request & Real-time Payment Monitor</p>
                 </div>
             </div>
             <div class="topbar-actions" id="topbar-actions" style="display: none;">
+                <button class="btn-top" id="notif-toggle-btn" onclick="requestNotificationPermission()">
+                    <i class="fas fa-bell"></i> <span id="notif-status-text">Enable Chrome Alerts</span>
+                </button>
                 <button class="btn-top" onclick="loadRequests()">
                     <i class="fas fa-sync-alt" id="refresh-icon"></i> Refresh
                 </button>
@@ -575,7 +663,7 @@
                     <i class="fas fa-key"></i>
                 </div>
                 <h2>Admin Verification</h2>
-                <p>Enter the master admin password configured in your <code>.env</code> file to unlock access.</p>
+                <p>Enter the master admin password configured in your environment to unlock access.</p>
 
                 <div id="gate-error" class="gate-error"></div>
 
@@ -597,6 +685,21 @@
 
         <!-- ── 2. Dashboard View ── -->
         <div id="dashboard-view" style="display: none;">
+            
+            <!-- Notification Prompt Banner -->
+            <div id="notif-banner" class="notif-banner" style="display: none;">
+                <div class="notif-banner-text">
+                    <i class="fas fa-bell"></i>
+                    <div>
+                        <strong>Chrome Real-time Notifications Chalu Karein!</strong><br>
+                        <span style="color: var(--text-muted); font-size: 13px;">Jaise hi koi user payment karega, aapke Chrome browser par turant pop-up notification aur sound bajega.</span>
+                    </div>
+                </div>
+                <button class="btn-banner" onclick="requestNotificationPermission()">
+                    <i class="fas fa-check"></i> Turn On Notifications
+                </button>
+            </div>
+
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -627,6 +730,10 @@
                         Pending Verification Queue
                         <span class="table-badge" id="queue-badge">0 Pending</span>
                     </h2>
+                    <div class="live-pulse">
+                        <span class="live-dot"></span>
+                        Real-time Live Sync (Active)
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -657,6 +764,9 @@
 
     <script>
         const STORAGE_KEY = 'anon_admin_pass';
+        let knownRequestIds = new Set();
+        let isFirstLoad = true;
+        let pollTimer = null;
 
         // Check if admin password is already saved in session
         window.addEventListener('DOMContentLoaded', () => {
@@ -664,6 +774,12 @@
             if (savedPassword) {
                 verifyAndProceed(savedPassword);
             }
+            updateNotifButtonUI();
+        });
+
+        // Reset document title when user switches back to this tab
+        window.addEventListener('focus', () => {
+            document.title = 'Admin Portal — Recharge Verification';
         });
 
         function togglePasswordVisibility() {
@@ -711,8 +827,10 @@
                     localStorage.setItem(STORAGE_KEY, password);
                     showDashboard();
                     loadRequests();
+                    startLivePolling();
+                    checkNotificationPermission();
                 } else {
-                    errorDiv.innerText = data.error || 'Incorrect Admin Password. Check ADMIN_PASSWORD in .env';
+                    errorDiv.innerText = data.error || 'Incorrect Admin Password. Check ADMIN_PASSWORD in your environment.';
                     errorDiv.style.display = 'block';
                     sessionStorage.removeItem(STORAGE_KEY);
                     localStorage.removeItem(STORAGE_KEY);
@@ -730,6 +848,7 @@
         }
 
         function lockAdmin() {
+            stopLivePolling();
             sessionStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(STORAGE_KEY);
             document.getElementById('password-gate-view').style.display = 'flex';
@@ -751,9 +870,149 @@
             return headers;
         }
 
-        async function loadRequests() {
+        /* ── Chrome Push & Web Audio Alert ── */
+        function checkNotificationPermission() {
+            if (!('Notification' in window)) return;
+            const banner = document.getElementById('notif-banner');
+            if (Notification.permission === 'default') {
+                if (banner) banner.style.display = 'flex';
+            } else {
+                if (banner) banner.style.display = 'none';
+            }
+            updateNotifButtonUI();
+        }
+
+        function updateNotifButtonUI() {
+            const btn = document.getElementById('notif-toggle-btn');
+            const text = document.getElementById('notif-status-text');
+            if (!btn || !text) return;
+
+            if (!('Notification' in window)) {
+                btn.style.display = 'none';
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                btn.className = 'btn-top btn-notif-active';
+                text.innerText = 'Chrome Alerts: Active';
+            } else if (Notification.permission === 'denied') {
+                btn.className = 'btn-top';
+                text.innerText = 'Chrome Alerts: Blocked';
+            } else {
+                btn.className = 'btn-top';
+                text.innerText = 'Enable Chrome Alerts';
+            }
+        }
+
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                alert('Aapka browser desktop notifications support nahi karta.');
+                return;
+            }
+
+            try {
+                const permission = await Notification.requestPermission();
+                updateNotifButtonUI();
+                const banner = document.getElementById('notif-banner');
+
+                if (permission === 'granted') {
+                    if (banner) banner.style.display = 'none';
+                    showToast('🔔 Chrome Alerts Chalu Ho Gaye!', 'success');
+                    playPaymentChime();
+
+                    // Send sample confirmation notification
+                    new Notification('✅ Notifications Enabled!', {
+                        body: 'Ab jaise hi koi user payment karega, aapko yahan real-time Chrome pop-up aayega.',
+                        icon: '/images/phonepe-qr.jpg'
+                    });
+                } else if (permission === 'denied') {
+                    showToast('Notifications are blocked in Chrome settings', 'error');
+                }
+            } catch (err) {
+                console.error('Notification error:', err);
+            }
+        }
+
+        // Crisp chime sound using native Web Audio API
+        function playPaymentChime() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const audioCtx = new AudioContext();
+
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+
+                // Two-tone bright notification sound
+                osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                osc1.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+
+                osc2.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.12); // D6
+
+                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.65);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc1.start();
+                osc2.start(audioCtx.currentTime + 0.12);
+                osc1.stop(audioCtx.currentTime + 0.65);
+                osc2.stop(audioCtx.currentTime + 0.65);
+            } catch (e) {
+                // Audio context may be restricted before user gesture
+            }
+        }
+
+        function triggerPaymentAlert(newRequests) {
+            playPaymentChime();
+
+            const count = newRequests.length;
+            document.title = `(${count}) 💰 Naya Payment Aaya! — Admin`;
+
+            if (window.Notification && Notification.permission === 'granted') {
+                newRequests.forEach(req => {
+                    const uName = req.userId ? req.userId.name : 'User';
+                    const notif = new Notification('💰 Naya Payment Received!', {
+                        body: `${uName} ne ₹${req.amount} pay kiya!\nUTR: ${req.utr}`,
+                        icon: '/images/phonepe-qr.jpg',
+                        tag: req._id,
+                        requireInteraction: true
+                    });
+
+                    notif.onclick = function () {
+                        window.focus();
+                        this.close();
+                    };
+                });
+            } else {
+                showToast(`🔔 ${count} Naya Payment Request Aaya Hai!`, 'success');
+            }
+        }
+
+        /* ── Live Sync Polling ── */
+        function startLivePolling() {
+            stopLivePolling();
+            pollTimer = setInterval(() => {
+                loadRequests(true); // silent background load
+            }, 6000); // Check every 6 seconds
+        }
+
+        function stopLivePolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        async function loadRequests(isBackground = false) {
             const refreshIcon = document.getElementById('refresh-icon');
-            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+            if (!isBackground && refreshIcon) refreshIcon.classList.add('fa-spin');
 
             try {
                 const res = await fetch('/api/admin/recharges', {
@@ -761,19 +1020,22 @@
                 });
 
                 if (res.status === 401 || res.status === 403) {
-                    showToast('Session expired or invalid password', 'error');
-                    lockAdmin();
+                    if (!isBackground) {
+                        showToast('Session expired or invalid password', 'error');
+                        lockAdmin();
+                    }
                     return;
                 }
 
                 const data = await res.json();
                 const tbody = document.getElementById('queue-tbody');
-                tbody.innerHTML = '';
 
                 if (!Array.isArray(data) || data.length === 0) {
                     document.getElementById('stat-pending-count').innerText = '0';
                     document.getElementById('stat-pending-total').innerText = '0.00';
                     document.getElementById('queue-badge').innerText = '0 Pending';
+                    knownRequestIds.clear();
+                    isFirstLoad = false;
 
                     tbody.innerHTML = `
                         <tr>
@@ -791,14 +1053,37 @@
                     return;
                 }
 
+                // Check for new incoming requests
+                const currentIds = new Set(data.map(r => r._id));
+                const newlyAdded = [];
+
+                data.forEach(req => {
+                    if (!knownRequestIds.has(req._id)) {
+                        newlyAdded.push(req);
+                    }
+                });
+
+                // Trigger real-time Chrome Notification & Sound if new payment arrived
+                if (!isFirstLoad && newlyAdded.length > 0) {
+                    triggerPaymentAlert(newlyAdded);
+                }
+
+                // Update known IDs
+                knownRequestIds = currentIds;
+                isFirstLoad = false;
+
                 // Update Stats
                 const totalAmount = data.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
                 document.getElementById('stat-pending-count').innerText = data.length;
                 document.getElementById('stat-pending-total').innerText = totalAmount.toFixed(2);
                 document.getElementById('queue-badge').innerText = `${data.length} Pending`;
 
+                tbody.innerHTML = '';
                 data.forEach(req => {
+                    const isNew = newlyAdded.some(n => n._id === req._id);
                     const tr = document.createElement('tr');
+                    if (isNew) tr.className = 'row-new';
+
                     const date = new Date(req.createdAt).toLocaleString('en-IN', {
                         day: 'numeric',
                         month: 'short',
@@ -843,9 +1128,11 @@
                 });
 
             } catch (err) {
-                showToast('Failed to load queue: ' + err.message, 'error');
+                if (!isBackground) {
+                    showToast('Failed to load queue: ' + err.message, 'error');
+                }
             } finally {
-                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                if (!isBackground && refreshIcon) refreshIcon.classList.remove('fa-spin');
             }
         }
 
@@ -914,7 +1201,7 @@
 
             setTimeout(() => {
                 toast.classList.remove('show');
-            }, 3000);
+            }, 3500);
         }
 
         function escapeHtml(str) {
