@@ -153,10 +153,10 @@ const authenticateToken = (req, res, next) => {
 const adminAuth = (req, res, next) => {
     try {
         const providedPass = req.headers['x-admin-password'] || req.query.adminPassword;
-        const adminPassword = process.env.ADMIN_PASSWORD || 'sahil@admin2026';
+        const adminPassword = process.env.ADMIN_PASSWORD;
 
-        // 1. Password-based access (from .env)
-        if (providedPass && providedPass === adminPassword) {
+        // 1. Password-based access (strictly from environment variable)
+        if (adminPassword && providedPass && providedPass === adminPassword) {
             return next();
         }
 
@@ -824,7 +824,12 @@ app.get('/api/user/recharges', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/verify-password', (req, res) => {
     const { password } = req.body || {};
-    const adminPassword = process.env.ADMIN_PASSWORD || 'sahil@admin2026';
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminPassword) {
+        return res.status(500).json({ success: false, error: 'ADMIN_PASSWORD is not configured in server environment' });
+    }
+
     if (password && password === adminPassword) {
         return res.json({ success: true, message: 'Password verified successfully' });
     }
