@@ -917,6 +917,34 @@
         </div>
     </div>
 
+    <!-- ── RECHARGE HISTORY MODAL ── -->
+    <div id="history-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="card-header">
+                <div class="card-header-icon" style="background: linear-gradient(135deg, var(--primary), var(--accent));">
+                    <i class="fas fa-list"></i>
+                </div>
+                <h2>Recharge History</h2>
+                <button onclick="document.getElementById('history-modal').classList.remove('open')" style="margin-left: auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px;"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>UTR</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recharge-history-tbody">
+                        <tr><td colspan="4"><div class="empty-history"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ── LOGIN SECTION ── -->
     <div id="login-section">
         <div class="login-wrap">
@@ -968,6 +996,9 @@
                     <div class="balance-mini-label">Wallet Balance</div>
                     <div class="balance-mini-amount">₹<span id="balance-amount">0.00</span></div>
                     <div class="balance-mini-rate">₹3.54/min incl. GST</div>
+                    <button class="btn btn-primary" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; width: auto; margin-left: auto;" onclick="openRechargeHistory()">
+                        <i class="fas fa-history"></i> History
+                    </button>
                 </div>
             </div>
 
@@ -1189,6 +1220,43 @@
                 const cb = modalCallback;
                 modalCallback = null;
                 cb(result);
+            }
+        }
+
+        async function openRechargeHistory() {
+            document.getElementById('history-modal').classList.add('open');
+            const tbody = document.getElementById('recharge-history-tbody');
+            tbody.innerHTML = '<tr><td colspan="4"><div class="empty-history"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div></td></tr>';
+            
+            try {
+                const res = await fetch('/api/recharge-history', { headers: authHeaders() });
+                if (handleUnauthorized(res)) return;
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (data.history.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-history"><i class="fas fa-inbox"></i><p>No recharge history</p></div></td></tr>';
+                    } else {
+                        tbody.innerHTML = data.history.map(item => {
+                            const date = new Date(item.createdAt).toLocaleDateString('en-IN');
+                            let statusBadge = '';
+                            if (item.status === 'approved') statusBadge = '<span class="status-badge badge-completed">Approved</span>';
+                            else if (item.status === 'rejected') statusBadge = '<span class="status-badge badge-failed">Rejected</span>';
+                            else statusBadge = '<span class="status-badge badge-initiated">Pending</span>';
+                            
+                            return `
+                                <tr>
+                                    <td>${date}</td>
+                                    <td><strong style="color: #10b981;">₹${item.amount}</strong></td>
+                                    <td style="font-family: monospace;">${item.utr}</td>
+                                    <td>${statusBadge}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="4"><div class="status-error">Failed to load history</div></td></tr>';
             }
         }
 

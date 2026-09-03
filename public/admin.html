@@ -1010,6 +1010,44 @@
             }
         }
 
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function subscribeToPush() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                let subscription = await registration.pushManager.getSubscription();
+                
+                if (!subscription) {
+                    const publicVapidKey = 'BHgFV7F-eQHIy8u4iR7XvRcnwOErs580g8CcpOsSxvjVNNeBju98d5Q6rPu-ubXrGHt2vF9D8IoMCdisAIMNMpY';
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                    });
+                }
+                
+                // Send to backend
+                await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+                    body: JSON.stringify(subscription)
+                });
+            } catch (err) {
+                console.error('Push subscribe error:', err);
+            }
+        }
+
         async function requestNotificationPermission() {
             if (!('Notification' in window)) {
                 alert('Aapka browser desktop notifications support nahi karta.');
@@ -1026,10 +1064,12 @@
                     showToast('🔔 Chrome Alerts Chalu Ho Gaye!', 'success');
                     playPaymentChime();
 
+                    await subscribeToPush();
+
                     // Send sample confirmation notification
                     new Notification('✅ Notifications Enabled!', {
-                        body: 'Ab jaise hi koi user payment karega, aapko yahan real-time Chrome pop-up aayega.',
-                        icon: '/images/phonepe-qr.jpg'
+                        body: 'Ab jaise hi koi user payment karega, aapko yahan real-time Chrome pop-up aayega (background me bhi).',
+                        icon: '/favicon.ico'
                     });
                 } else if (permission === 'denied') {
                     showToast('Notifications are blocked in Chrome settings', 'error');

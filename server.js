@@ -7,6 +7,15 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 require('dotenv').config();
+const webpush = require('web-push');
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        'mailto:' + (process.env.ADMIN_EMAIL || 'admin@example.com'),
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -543,6 +552,31 @@ const rechargeRequestSchema = new mongoose.Schema({
 });
 const RechargeRequest = mongoose.model('RechargeRequest', rechargeRequestSchema);
 
+const adminPushSchema = new mongoose.Schema({
+    subscription: { type: mongoose.Schema.Types.Mixed, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+const AdminPushSubscription = mongoose.model('AdminPushSubscription', adminPushSchema);
+
+async function sendAdminPush(payload) {
+    try {
+        const subs = await AdminPushSubscription.find();
+        for (const sub of subs) {
+            try {
+                await webpush.sendNotification(sub.subscription, JSON.stringify(payload));
+            } catch (err) {
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    await AdminPushSubscription.findByIdAndDelete(sub._id);
+                } else {
+                    console.error('Push error:', err);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Failed to send admin push', e);
+    }
+}
+
 async function getEdesyBalance() {
     try {
         const response = await fetch(
@@ -838,6 +872,13 @@ app.post(
                     name: user ? user.name : 'Unknown User',
                     email: user ? user.email : 'No email'
                 }
+            });
+
+            // Send Push Notification if admin is away
+            sendAdminPush({
+                title: 'New Recharge Request',
+                body: `₹${request.amount} added with UTR: ${request.utr}`,
+                url: '/admin.html'
             });
 
             res.json({
@@ -2420,6 +2461,37 @@ async function applyOneTimeBalanceCorrection() {
         `One-time balance correction applied: ₹${correction}`
     );
 }
+
+app.post('/api/subscribe', isAdmin, async (req, res) => {
+    try {
+        const subscription = req.body;
+        if (!subscription || !subscription.endpoint) {
+            return res.status(400).json({ error: 'Invalid subscription' });
+        }
+        
+        // Save or update
+        await AdminPushSubscription.findOneAndUpdate(
+            { 'subscription.endpoint': subscription.endpoint },
+            { subscription },
+            { upsert: true, new: true }
+        );
+        
+        res.status(201).json({ success: true });
+    } catch (err) {
+        console.error('Subscribe error:', err);
+        res.status(500).json({ error: 'Failed to subscribe' });
+    }
+});
+
+app.get('/api/recharge-history', authenticateToken, async (req, res) => {
+    try {
+        const history = await RechargeRequest.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+        res.json({ success: true, history });
+    } catch (err) {
+        console.error('Recharge history error:', err);
+        res.status(500).json({ error: 'Failed to fetch history' });
+    }
+});
 
 async function startServer() {
     try {
