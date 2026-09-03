@@ -166,7 +166,16 @@ const adminAuth = (req, res, next) => {
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                const adminEmails = ['23cssahil@gmail.com', 'username47397@gmail.com'];
+                const envEmails = [
+                    process.env.ADMIN_EMAIL || '',
+                    process.env.ADMIN_EMAILS || ''
+                ].join(',').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+                const adminEmails = [
+                    '23cssahil@gmail.com',
+                    'username47397@gmail.com',
+                    ...envEmails
+                ];
                 if (decoded && decoded.email && adminEmails.includes(decoded.email.toLowerCase())) {
                     req.user = decoded;
                     return next();
