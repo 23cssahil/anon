@@ -672,6 +672,25 @@ app.get('/api/pool-status', async (req, res) => {
     }
 });
 
+// New: raw Edesy balance in rupees — used by frontend recharge check
+app.get('/api/edesy-balance', authenticateToken, async (req, res) => {
+    try {
+        const rawBalance = await getEdesyBalance();
+        // rawBalance is the direct rupee value from Edesy API (e.g. ₹33)
+        // Max user talktime supportable = rawBalance × 2
+        // (Each ₹3 user talktime costs ₹1.50 from Edesy → ratio = 2:1)
+        const maxUserTalktime = Math.floor(rawBalance * 2);
+        res.json({
+            success: true,
+            edesyBalanceRupees: rawBalance,
+            maxUserTalktime
+        });
+    } catch (err) {
+        console.error('Edesy balance fetch error:', err.message);
+        res.status(500).json({ success: false, error: 'Could not fetch Edesy balance' });
+    }
+});
+
 app.post(
     '/auth/google-login',
     loginLimiter,

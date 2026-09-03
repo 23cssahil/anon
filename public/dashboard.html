@@ -1489,27 +1489,23 @@
                 return;
             }
 
-            // ── Edesy Pool Check: make sure enough Edesy balance exists ──
+            // ── Edesy Balance Check: ensure enough balance for requested talktime ──
             try {
-                const poolRes = await fetch('/api/pool-status');
-                if (poolRes.ok) {
-                    const poolData = await poolRes.json();
-                    // edesyTotalRupees is Edesy balance × COMMISSION (₹1.50/min)
-                    // User talktime of ₹X needs Edesy ₹(X × 0.5) i.e. X/2
-                    const edesyAvailable = poolData.edesyTotalRupees || 0;
-                    const edesyNeeded = amount * 0.5; // each ₹1 user talktime costs ₹0.50 on Edesy
-                    if (edesyNeeded > edesyAvailable) {
-                        const maxUserTalktime = Math.floor(edesyAvailable * 2);
+                const balRes = await fetch('/api/edesy-balance');
+                if (balRes.ok) {
+                    const balData = await balRes.json();
+                    const maxTalk = balData.maxUserTalktime || 0;
+                    if (amount > maxTalk) {
                         showAlert(
                             `❌ Abhi itna bada recharge available nahi hai.\n\n` +
-                            `Edesy account balance kam hai. Abhi maximum ₹${maxUserTalktime} tak ka recharge karo.`,
+                            `Edesy balance ₹${balData.edesyBalanceRupees} hai. Maximum talktime ₹${maxTalk} tak ka recharge karo.`,
                             '❌'
                         );
                         return;
                     }
                 }
-            } catch (poolErr) {
-                console.warn('Pool check failed, allowing recharge:', poolErr);
+            } catch (balErr) {
+                console.warn('Edesy balance check failed, allowing recharge:', balErr);
             }
 
             const totalToPay = amount * 1.18;
