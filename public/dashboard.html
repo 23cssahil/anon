@@ -983,9 +983,9 @@
 
                 <div class="hint-box">
                     <strong>📱 How to Pay:</strong><br>
-                    1. Amount enter karein below.<br>
-                    2. <strong>"Scan &amp; Pay via PhonePe"</strong> click karein.<br>
-                    3. QR code scan karein (UPI: <strong>8423609308@ybl</strong>).
+                    1. QR code scan karein (UPI: <strong>8423609308@ybl</strong>).<br>
+                    2. Payment ke baad PhonePe se 12-digit <strong>UTR/Reference No.</strong> copy karein.<br>
+                    3. Niche Amount aur UTR daal kar Submit dabayein.
                 </div>
 
                 <div class="qr-container">
@@ -997,20 +997,21 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="recharge-amount">Amount (₹)</label>
+                    <label for="recharge-amount">Amount Paid (₹)</label>
                     <input type="number" id="recharge-amount" placeholder="Enter amount (minimum ₹3)" min="3" step="1"
-                        oninput="calculateGst(); updateUpiLink();">
+                        oninput="calculateGst();">
                 </div>
 
-                <div class="gst-display" id="gst-display">Total: ₹0.00</div>
+                <div class="form-group">
+                    <label for="recharge-utr">UTR / Reference Number</label>
+                    <input type="text" id="recharge-utr" placeholder="12-digit number (e.g. 312345678901)" maxlength="12"
+                        oninput="calculateGst();">
+                </div>
 
-                <a href="javascript:void(0);" id="scan-pay-btn" class="btn btn-phonepe"
-                    onclick="openPhonePeApp(event)">
-                    <i class="fas fa-qrcode"></i> Scan &amp; Pay via PhonePe
-                </a>
+                <div class="gst-display" id="gst-display">Total Talktime: ~0.0 Minutes</div>
 
                 <button id="add-min-btn" class="btn btn-success" onclick="confirmAndAddMinutes()" disabled>
-                    <i class="fas fa-check-circle"></i> Payment Done – Check Status
+                    <i class="fas fa-paper-plane"></i> Submit Recharge Request
                 </button>
             </div>
 
@@ -1353,94 +1354,77 @@
             }
         }
 
-        // ── UPI Link Update (BUG FIX: updateUpiLink moved to proper scope) ──
-        function updateUpiLink() {
-            const amount = Number(document.getElementById('recharge-amount').value);
-            const btn = document.getElementById('scan-pay-btn');
-            if (amount >= 3) {
-                btn.href = `upi://pay?pa=8423609308@ybl&pn=Sahil%20Khan&am=${amount}&cu=INR`;
-            } else {
-                btn.href = 'javascript:void(0);';
-            }
-        }
-
-        function openPhonePeApp(event) {
-            const amount = Number(document.getElementById('recharge-amount').value);
-            if (!amount || amount < 3) {
-                if (event) event.preventDefault();
-                showAlert('Kam se kam ₹3 ya usse zyada ka amount enter karein!', '⚠️');
-            }
-        }
-
         // ── GST Calculation (BUG FIX: correct minutes = baseAmount / USER_RATE_WITH_GST) ──
         function calculateGst() {
             const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
+            const utr = document.getElementById('recharge-utr') ? document.getElementById('recharge-utr').value.trim() : '';
             const gstDisplay = document.getElementById('gst-display');
             const addBtn = document.getElementById('add-min-btn');
 
             if (baseAmount <= 0) {
-                if (gstDisplay) gstDisplay.innerText = 'Total: ₹0.00';
+                if (gstDisplay) gstDisplay.innerText = 'Total Talktime: ~0.0 Minutes';
                 if (addBtn) addBtn.disabled = true;
                 return;
             }
 
-            const gstAmount = baseAmount * 0.18;
-            const totalAmount = baseAmount + gstAmount;
-            // BUG FIX: actual talktime = baseAmount / USER_RATE_WITH_GST (3.54), not baseAmount / 3
             const talkMinutes = baseAmount / USER_RATE_WITH_GST;
 
             if (gstDisplay) {
                 gstDisplay.innerHTML =
-                    `Base: ₹${baseAmount.toFixed(2)} + GST (18%): ₹${gstAmount.toFixed(2)}<br>` +
-                    `<b style="color:#059669;">Total Payable: ₹${totalAmount.toFixed(2)}</b><br>` +
+                    `<b style="color:#059669;">Amount Paid: ₹${baseAmount.toFixed(2)}</b><br>` +
                     `<small style="color:#7c3aed;">Talktime: ~${talkMinutes.toFixed(1)} Minutes</small>`;
             }
-            if (addBtn) addBtn.disabled = false;
+            
+            // Enable button only if both amount and 12-digit UTR are provided
+            if (addBtn) {
+                addBtn.disabled = !(baseAmount >= 3 && utr.length >= 12);
+            }
         }
 
-        // ── Confirm Recharge ──
+        // ── Confirm Recharge Request ──
         async function confirmAndAddMinutes() {
             const amount = Number(document.getElementById('recharge-amount').value) || 0;
+            const utr = document.getElementById('recharge-utr').value.trim();
+            
             if (amount < 3 || !Number.isFinite(amount)) {
                 showAlert('Enter a valid amount (minimum ₹3).', '⚠️');
                 return;
             }
+            if (utr.length < 12) {
+                showAlert('Please enter a valid 12-digit UTR or Reference number from your payment app.', '⚠️');
+                return;
+            }
 
-            const totalAmount = Number((amount * 1.18).toFixed(2));
             showConfirm(
-                `Payment of ₹${totalAmount.toFixed(2)} complete hone ke baad hi balance add hoga. Continue?`,
+                `Aapne ₹${amount} pay kiya hai and UTR ${utr} hai. Submit karein?`,
                 async (confirmed) => {
                     if (!confirmed) return;
+                    
+                    const btn = document.getElementById('add-min-btn');
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
                     try {
                         const response = await fetch('/api/add-recharge', {
                             method: 'POST',
                             headers: authHeaders(true),
-                            body: JSON.stringify({ amount })
+                            body: JSON.stringify({ amount, utr })
                         });
                         const data = await response.json().catch(() => ({}));
 
                         if (response.ok) {
-                            showAlert('✅ Recharge request accepted!', '✅');
-                            if (typeof data.newBalance === 'number') {
-                                const bal = data.newBalance.toFixed(2);
-                                document.getElementById('balance-amount').innerText = bal;
-                                document.getElementById('dd-balance').innerText = bal;
-                            }
+                            showAlert('✅ Recharge request submitted! Admin will verify and add balance soon.', '✅');
                             document.getElementById('recharge-amount').value = '';
-                            document.getElementById('gst-display').innerText = 'Total: ₹0.00';
-                            document.getElementById('add-min-btn').disabled = true;
-                            checkPoolStatus();
-                        } else if (response.status === 503) {
-                            showAlert(
-                                '⚠️ Payment verification is not enabled yet.\n\n' +
-                                'UPI payment ke baad balance manually add kiya jayega.',
-                                '⚠️'
-                            );
+                            document.getElementById('recharge-utr').value = '';
+                            document.getElementById('gst-display').innerText = 'Total Talktime: ~0.0 Minutes';
                         } else {
-                            showAlert('❌ ' + (data.error || 'Recharge could not be processed.'), '❌');
+                            showAlert('❌ ' + (data.error || 'Request could not be processed.'), '❌');
                         }
                     } catch (error) {
                         showAlert('❌ Network error: ' + error.message, '❌');
+                    } finally {
+                        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Recharge Request';
+                        calculateGst();
                     }
                 },
                 '💳'

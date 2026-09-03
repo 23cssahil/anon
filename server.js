@@ -150,6 +150,19 @@ const authenticateToken = (req, res, next) => {
     );
 };
 
+const isAdmin = async (req, res, next) => {
+    try {
+        const adminEmails = ['23cssahil@gmail.com'];
+        if (adminEmails.includes(req.user.email)) {
+            next();
+        } else {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+    } catch (err) {
+        return res.status(500).json({ error: 'Admin check failed' });
+    }
+};
+
 function validatePhone(phone) {
     return typeof phone === 'string' &&
         /^[6-9]\d{9}$/.test(phone);
@@ -464,6 +477,15 @@ const CallHistory = mongoose.model(
     callSchema
 );
 
+const rechargeRequestSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    amount: { type: Number, required: true },
+    utr: { type: String, required: true, unique: true },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },
+    createdAt: { type: Date, default: Date.now, index: true }
+});
+const RechargeRequest = mongoose.model('RechargeRequest', rechargeRequestSchema);
+
 async function getEdesyBalance() {
     try {
         const response = await fetch(
@@ -719,81 +741,103 @@ app.post(
     rechargeLimiter,
     async (req, res) => {
         try {
-            const baseAmount =
-                Number(req.body.amount);
+            const baseAmount = Number(req.body.amount);
+            const utr = req.body.utr;
 
-            if (
-                !Number.isFinite(baseAmount) ||
-                baseAmount <= 0 ||
-                baseAmount > 100000
-            ) {
-                return res.status(400).json({
-                    error:
-                        'Valid recharge amount required'
-                });
+            if (!Number.isFinite(baseAmount) || baseAmount < 3 || baseAmount > 100000) {
+                return res.status(400).json({ error: 'Valid recharge amount required (min ₹3)' });
             }
 
-            const gstAmount = roundMoney(
-                baseAmount *
-                GST_RATE
-            );
-
-            const totalAmount = roundMoney(
-                baseAmount +
-                gstAmount
-            );
-
-            if (
-                process.env.NODE_ENV === 'production'
-            ) {
-                return res.status(503).json({
-                    error:
-                        'Recharge is temporarily unavailable until payment verification is configured.'
-                });
+            if (!utr || typeof utr !== 'string' || utr.trim().length < 12) {
+                return res.status(400).json({ error: 'Valid 12-digit UTR/Reference number required' });
             }
 
-            const user =
-                await User.findById(
-                    req.user.userId
-                );
+            const cleanUtr = sanitizeInput(utr);
 
-            if (!user) {
-                return res.status(404).json({
-                    error: 'User not found'
-                });
+            const existing = await RechargeRequest.findOne({ utr: cleanUtr });
+            if (existing) {
+                return res.status(400).json({ error: 'This UTR has already been submitted.' });
             }
 
-            user.balance = roundMoney(
-                user.balance +
-                baseAmount
-            );
+            const request = new RechargeRequest({
+                userId: req.user.userId,
+                amount: baseAmount,
+                utr: cleanUtr,
+                status: 'pending'
+            });
 
-            await user.save();
+            await request.save();
 
             res.json({
                 success: true,
-                message:
-                    'Development recharge successful.',
-                baseAmount,
-                gstAmount,
-                totalAmount,
-                creditedAmount:
-                    baseAmount,
-                newBalance:
-                    roundMoney(user.balance)
+                message: 'Recharge request submitted successfully. It will be verified shortly.'
             });
         } catch (error) {
-            console.error(
-                'Recharge error:',
-                error.message
-            );
-
-            res.status(500).json({
-                error:
-                    'Server error during recharge'
-            });
+            console.error('Recharge request error:', error.message);
+            res.status(500).json({ error: 'Server error during recharge request' });
         }
     }
+);
+
+app.get('/api/user/recharges', authenticateToken, async (req, res) => {
+    try {
+        const requests = await RechargeRequest.find({ userId: req.user.userId })
+            .sort({ createdAt: -1 })
+            .limit(20);
+        res.json(requests);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch recharge history' });
+    }
+});
+
+app.get('/api/admin/recharges', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const requests = await RechargeRequest.find({ status: 'pending' })
+            .populate('userId', 'name email')
+            .sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch pending requests' });
+    }
+});
+
+app.post('/api/admin/recharges/:id/approve', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const reqDoc = await RechargeRequest.findById(req.params.id);
+        if (!reqDoc || reqDoc.status !== 'pending') {
+            return res.status(400).json({ error: 'Invalid or already processed request' });
+        }
+
+        reqDoc.status = 'approved';
+        await reqDoc.save();
+
+        const user = await User.findById(reqDoc.userId);
+        if (user) {
+            user.balance = roundMoney(user.balance + reqDoc.amount);
+            await user.save();
+        }
+
+        res.json({ success: true, message: 'Recharge approved and balance added.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to approve recharge' });
+    }
+});
+
+app.post('/api/admin/recharges/:id/reject', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const reqDoc = await RechargeRequest.findById(req.params.id);
+        if (!reqDoc || reqDoc.status !== 'pending') {
+            return res.status(400).json({ error: 'Invalid or already processed request' });
+        }
+
+        reqDoc.status = 'rejected';
+        await reqDoc.save();
+
+        res.json({ success: true, message: 'Recharge rejected.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to reject recharge' });
+    }
+}
 );
 
 app.get(
