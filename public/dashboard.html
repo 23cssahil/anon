@@ -995,7 +995,7 @@
                 <div class="profile-balance-mini">
                     <div class="balance-mini-label">Wallet Balance</div>
                     <div class="balance-mini-amount">₹<span id="balance-amount">0.00</span></div>
-                    <div class="balance-mini-rate">₹3.54/min incl. GST</div>
+                    <div class="balance-mini-rate">₹3.00/min</div>
                     <button class="btn btn-primary" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; width: auto; margin-left: auto;" onclick="openRechargeHistory()">
                         <i class="fas fa-history"></i> History
                     </button>
@@ -1015,9 +1015,10 @@
 
                 <div class="hint-box">
                     <strong>📱 How to Pay:</strong><br>
-                    1. QR code scan karein (UPI: <strong>8423609308@ybl</strong>).<br>
-                    2. Payment ke baad PhonePe se 12-digit <strong>UTR/Reference No.</strong> copy karein.<br>
-                    3. Niche Amount aur UTR daal kar Submit dabayein.<br>
+                    1. Niche <strong>kitni talktime chahiye</strong> woh amount dalein (e.g. ₹100).<br>
+                    2. Calculator <strong>18% GST</strong> jodhega aur <strong>total PhonePe amount</strong> dikhayega.<br>
+                    3. Woh total amount PhonePe par pay karein (UPI: <strong>8423609308@ybl</strong>).<br>
+                    4. PhonePe se 12-digit <strong>UTR/Reference No.</strong> copy karein aur niche submit karein.<br>
                     <span style="color:#059669;font-weight:600;"><i class="fas fa-clock"></i> Note: Admin 1 ghante ke andar verify karke minutes add kar dega.</span>
                 </div>
 
@@ -1030,8 +1031,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="recharge-amount">Amount Paid (₹)</label>
-                    <input type="number" id="recharge-amount" placeholder="Enter amount (minimum ₹3)" min="3" step="1"
+                    <label for="recharge-amount">Talktime Amount Needed (₹)</label>
+                    <input type="number" id="recharge-amount" placeholder="e.g. 100" min="3" step="1"
                         oninput="calculateGst();">
                 </div>
 
@@ -1041,7 +1042,7 @@
                         oninput="calculateGst();">
                 </div>
 
-                <div class="gst-display" id="gst-display">Total Talktime: ~0.0 Minutes</div>
+                <div class="gst-display" id="gst-display">Enter talktime amount to see total payable (incl. 18% GST)</div>
 
                 <button id="add-min-btn" class="btn btn-success" onclick="confirmAndAddMinutes()" disabled>
                     <i class="fas fa-paper-plane"></i> Submit Recharge Request
@@ -1152,8 +1153,8 @@
         let userToken = null;
         let modalCallback = null;
 
-        // USER_RATE_WITH_GST = 3 * 1.18 = 3.54 (must match server constant)
-        const USER_RATE_WITH_GST = 3.54;
+        // Call rate is strictly ₹3.00/min
+        const USER_RATE = 3.00;
 
         // ── Helpers ──
         function authHeaders(includeJson = false) {
@@ -1444,7 +1445,7 @@
             }
         }
 
-        // ── GST Calculation (BUG FIX: correct minutes = baseAmount / USER_RATE_WITH_GST) ──
+        // ── GST Calculation ──
         function calculateGst() {
             const baseAmount = Number(document.getElementById('recharge-amount').value) || 0;
             const utr = document.getElementById('recharge-utr') ? document.getElementById('recharge-utr').value.trim() : '';
@@ -1452,17 +1453,20 @@
             const addBtn = document.getElementById('add-min-btn');
 
             if (baseAmount <= 0) {
-                if (gstDisplay) gstDisplay.innerText = 'Total Talktime: ~0.0 Minutes';
+                if (gstDisplay) gstDisplay.innerText = 'Talktime: ₹0 | Total to Pay: ₹0';
                 if (addBtn) addBtn.disabled = true;
                 return;
             }
 
-            const talkMinutes = baseAmount / USER_RATE_WITH_GST;
+            const gstAmount = baseAmount * 0.18;
+            const totalToPay = baseAmount + gstAmount;
+            const talkMinutes = baseAmount / USER_RATE;
 
             if (gstDisplay) {
                 gstDisplay.innerHTML =
-                    `<b style="color:#059669;">Amount Paid: ₹${baseAmount.toFixed(2)}</b><br>` +
-                    `<small style="color:#7c3aed;">Talktime: ~${talkMinutes.toFixed(1)} Minutes</small>`;
+                    `<b style="color:#1e40af;">Add 18% GST: ₹${gstAmount.toFixed(2)}</b><br>` +
+                    `<b style="color:#059669; font-size:15px;">Total to Pay on PhonePe: ₹${totalToPay.toFixed(2)}</b><br>` +
+                    `<small style="color:#7c3aed; margin-top:4px; display:block;">You will get ~${talkMinutes.toFixed(1)} Minutes of Talktime</small>`;
             }
             
             // Enable button only if both amount and 12-digit UTR are provided
@@ -1485,8 +1489,9 @@
                 return;
             }
 
+            const totalToPay = amount * 1.18;
             showConfirm(
-                `Aapne ₹${amount} pay kiya hai and UTR ${utr} hai. Submit karein?`,
+                `Kripya confirm karein ki aapne ₹${totalToPay.toFixed(2)} PhonePe par pay kiya hai aur UTR ${utr} hai. Submit karein?`,
                 async (confirmed) => {
                     if (!confirmed) return;
                     
@@ -1506,7 +1511,7 @@
                             showAlert('✅ Recharge request submitted!\n\nAdmin 1 ghante ke andar verify karke minutes add kar dega.', '✅');
                             document.getElementById('recharge-amount').value = '';
                             document.getElementById('recharge-utr').value = '';
-                            document.getElementById('gst-display').innerText = 'Total Talktime: ~0.0 Minutes';
+                            document.getElementById('gst-display').innerText = 'Enter talktime amount to see total payable (incl. 18% GST)';
                         } else {
                             showAlert('❌ ' + (data.error || 'Request could not be processed.'), '❌');
                         }
@@ -1628,16 +1633,27 @@
                         ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
                     );
 
-                    // BUG FIX: show 0 for no-answer/failed, not default 1
-                    const duration = (item.durationMinutes !== undefined && item.durationMinutes !== null)
-                        ? item.durationMinutes : 0;
+                    // Exact duration from Edesy data (durationSeconds is the raw Edesy value)
+                    const totalSecs = Number(item.durationSeconds || 0);
+                    const dispMins = Math.floor(totalSecs / 60);
+                    const dispSecs = totalSecs % 60;
+                    let durationText;
+                    if (totalSecs === 0) {
+                        durationText = '—';
+                    } else if (dispMins === 0) {
+                        durationText = `${dispSecs}s`;
+                    } else {
+                        durationText = `${dispMins}m ${dispSecs}s`;
+                    }
+
+                    // Cost = billable minutes × ₹3.00 (no GST on calls)
                     const cost = Number(item.cost || 0);
                     const date = item.date ? new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
                     const status = item.status || 'unknown';
 
                     tr.innerHTML = `
                         <td><strong>${targetPhone}</strong></td>
-                        <td>${duration} min</td>
+                        <td>${durationText}</td>
                         <td>${statusBadge(status)}</td>
                         <td>₹${cost.toFixed(2)}</td>
                         <td>${date}</td>

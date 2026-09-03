@@ -278,15 +278,9 @@ function calculateBilling(actualDurationSeconds) {
         CALL_RATE_PER_MINUTE
     );
 
-    const gstAmount = roundMoney(
-        baseCost *
-        GST_RATE
-    );
+    const gstAmount = 0; // GST is no longer deducted on per-call basis, only at recharge
 
-    const totalCost = roundMoney(
-        baseCost +
-        gstAmount
-    );
+    const totalCost = baseCost; // User pays exactly ₹3.00/min
 
     const providerBaseCost = roundMoney(
         billableMinutes *
