@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -7,6 +9,29 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
+
+io.on('connection', (socket) => {
+    socket.on('join-admin', (data) => {
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        if (data && data.password && adminPassword && data.password === adminPassword) {
+            socket.join('admin-room');
+            socket.emit('admin-authenticated', { success: true });
+        }
+    });
+
+    socket.on('join-user', (userId) => {
+        if (userId) {
+            socket.join(`user-${userId}`);
+        }
+    });
+});
 
 if (!process.env.MONGO_URI) {
     console.error('MONGO_URI is not defined');
@@ -800,6 +825,21 @@ app.post(
 
             await request.save();
 
+            const user = await User.findById(req.user.userId);
+
+            // Real-time instant push notification to Admin via Socket.io
+            io.to('admin-room').emit('new-recharge-request', {
+                _id: request._id,
+                amount: request.amount,
+                utr: request.utr,
+                createdAt: request.createdAt,
+                userId: {
+                    _id: req.user.userId,
+                    name: user ? user.name : 'Unknown User',
+                    email: user ? user.email : 'No email'
+                }
+            });
+
             res.json({
                 success: true,
                 message: 'Recharge request submitted successfully. It will be verified shortly.'
@@ -861,6 +901,12 @@ app.post('/api/admin/recharges/:id/approve', adminAuth, async (req, res) => {
         if (user) {
             user.balance = roundMoney(user.balance + reqDoc.amount);
             await user.save();
+
+            // Real-time update to the user's dashboard via Socket.io
+            io.to(`user-${reqDoc.userId}`).emit('recharge-approved', {
+                amount: reqDoc.amount,
+                newBalance: roundMoney(user.balance)
+            });
         }
 
         res.json({ success: true, message: 'Recharge approved and balance added.' });
@@ -2389,7 +2435,7 @@ async function startServer() {
 
         await applyOneTimeBalanceCorrection();
 
-        app.listen(
+        server.listen(
             PORT,
             () => {
                 console.log(

@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
             --primary: #7c3aed;
@@ -1326,6 +1327,26 @@
 
                 loadHistory();
                 checkPoolStatus();
+
+                // Real-time socket listener for user wallet updates
+                if (typeof io !== 'undefined' && userId) {
+                    try {
+                        const userSocket = io();
+                        userSocket.on('connect', () => {
+                            userSocket.emit('join-user', userId);
+                        });
+                        userSocket.on('recharge-approved', (data) => {
+                            showAlert(`🎉 Recharge Approved!\n\n₹${data.amount} aapke wallet me credit ho gaye hain!`, '🎉');
+                            if (typeof data.newBalance === 'number') {
+                                const bal = data.newBalance.toFixed(2);
+                                document.getElementById('balance-amount').innerText = bal;
+                                document.getElementById('dd-balance').innerText = bal;
+                            }
+                        });
+                    } catch (sockErr) {
+                        console.error('User socket error:', sockErr);
+                    }
+                }
 
             } catch (error) {
                 console.error('Dashboard load error:', error);
