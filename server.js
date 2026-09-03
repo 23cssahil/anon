@@ -769,7 +769,7 @@ app.post(
                     email: cleanEmail,
                     name: cleanName,
                     googleId: cleanGoogleId,
-                    balance: 0,
+                    balance: 3, // ₹3 signup bonus
                     termsAccepted: true,
                     termsAcceptedAt: new Date(),
                     signupIp: clientIp
@@ -1263,11 +1263,10 @@ app.post(
                                         userPhone,
                                     party_b:
                                         phoneNumber,
-                                    // CRITICAL FIX: Pass max_duration so Edesy auto-disconnects
-                                    // the call after durationLimitMinutes. Without this, calls
-                                    // ran forever regardless of user's selected limit.
+                                    // Pass max_duration in SECONDS to Edesy API
+                                    // so the call is auto-disconnected after the selected duration.
                                     max_duration:
-                                        durationLimitMinutes
+                                        durationLimitMinutes * 60
                                 })
                         }
                     );
@@ -1404,6 +1403,33 @@ app.post(
 
                 throw historyError;
             }
+
+            // Server-side safety timer: forcefully hang up the call via Edesy API
+            // after durationLimitMinutes + 30 seconds grace period.
+            // This ensures billing stops even if Edesy's own max_duration fails.
+            const hangupDelayMs = (durationLimitMinutes * 60 + 30) * 1000;
+            const capturedCallSid = callSid;
+            setTimeout(async () => {
+                try {
+                    // Check if call is already finalized (completed via webhook)
+                    const callRecord = await CallHistory.findOne({ callSid: capturedCallSid, billingFinalized: false });
+                    if (!callRecord) return; // Already done, nothing to do
+
+                    // Attempt to hang up the call via Edesy API
+                    await fetch(
+                        `https://voice-api.edesy.in/v1/masking/calls/${capturedCallSid}`,
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                Authorization: `Bearer ${process.env.EDESY_API_KEY}`
+                            }
+                        }
+                    );
+                    console.log(`[AutoHangup] Call ${capturedCallSid} hang-up triggered after ${durationLimitMinutes} min limit.`);
+                } catch (err) {
+                    console.error(`[AutoHangup] Failed to hang up call ${capturedCallSid}:`, err.message);
+                }
+            }, hangupDelayMs);
 
             res.json({
                 success: true,
