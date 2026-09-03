@@ -156,7 +156,7 @@ const isAdmin = async (req, res, next) => {
         if (adminEmails.includes(req.user.email)) {
             next();
         } else {
-            return res.status(403).json({ error: 'Admin access required' });
+            return res.status(403).json({ error: `Admin access required. Your email is: ${req.user.email}` });
         }
     } catch (err) {
         return res.status(500).json({ error: 'Admin check failed' });
